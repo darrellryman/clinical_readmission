@@ -1,0 +1,32 @@
+# Runs the automated checks on GitHub every time code is pushed to main, and on
+# every pull request before it is merged. A red cross on the Actions tab means a
+# check failed.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # GitHub lends the job a fresh Ubuntu machine. Nothing carries over from your computer.
+    runs-on: ubuntu-latest
+    steps:
+      # Copies the repository onto that machine.
+      - uses: actions/checkout@v4
+
+      # Installs Python. cache: pip keeps downloaded libraries between runs, so later runs are faster.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Installs the libraries. mlflow, fastapi and matplotlib are included so the tracking,
+      # service and plots tests run instead of being skipped.
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Runs every test. Any failure turns the run red.
+      - name: Run tests
+        run: python -m pytest tests -q
