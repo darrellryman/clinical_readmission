@@ -1,0 +1,327 @@
+# config.yaml
+#
+# Central settings for the whole pipeline. Every script in src/ reads its values
+# from this file, so behaviour is changed here and not inside the Python code.
+#
+# All paths are relative to the project root, which is the folder commands
+# are run from (for example: python -m src.train).
+#
+# To use a different config file, either pass --config to any script, or set
+# the PIPELINE_CONFIG environment variable.
+
+# General settings shared by more than one stage.
+project:
+  # Seed for anything random (the train/test split and the model). A fixed value
+  # makes every run repeatable.
+  random_state: 42
+  # Define the problem that the AI system addresses
+  client_question: At the point of discharge, will an adult inpatient be readmitted within 30 days?
+
+# Where the data lives.
+data:
+  # Where the raw data comes from. "file" reads raw_path as it is. "url" downloads
+  # raw_url into raw_path first, then reads that local copy, so every later stage
+  # (and DVC and MLflow) still sees one raw file in one place.
+  source: file
+  # The original dataset as you received it. Only ingest.py reads this file.
+  # With source: url this is where the download is saved.
+  raw_path: data/raw/synthetic_clinical_dataset.csv
+  # The web address to download when source is url (http or https). Leave null for a file.
+  raw_url: null
+  # Seconds to wait for the server on each download attempt, and how many
+  # attempts to make before ingest stops with an error. Used only for a url.
+  download_timeout: 30
+  download_retries: 3
+  # The cleaned copy that ingest.py writes. validate.py, train.py and
+  # evaluate.py read this file, so run ingest.py first.
+  processed_path: data/processed/clean_synthetic_clinical_dataset.csv
+  # The only columns ingest.py keeps when it makes the cleaned copy. The names
+  # must match the raw CSV header exactly, including capital letters. Every
+  # column listed under features below must also be listed here.
+  keep_columns:
+    - age
+    - sex
+    - bmi
+    - systolic_bp
+    - diastolic_bp
+    - glucose
+    - cholesterol
+    - creatinine
+    - diabetes
+    - hypertension
+    - diagnosis
+    - readmission_30d
+  # Rows are kept only if the value in the named column is on its list. Any
+  # other value, and any blank, removes the row. Use {} to keep every row.
+  allowed_values:
+    sex:
+      - Female
+      - Male
+  # A range filter on one numeric column. Rows whose value in value_column falls
+  # outside min_value to max_value are removed in ingest.py, so training, testing
+  # and the new-patient hold-out never see them. Both ends are included. Use
+  # null for either one to leave that end open. To keep a band, set both, for
+  # example 40 and 59.
+  # To filter another column, such as bmi, change all three settings.
+  min_value: 18
+  max_value: 100
+  # The column to filter. It must be one of keep_columns when either end is set.
+  value_column: age
+  # The share of patients ingest.py sets aside as "new" patients, before anything
+  # else sees the data. Training, testing and comparing never touch them, so
+  # predicting on them shows how the model does on patients it has never met.
+  # 0.05 is 5 percent. Use 0 to set none aside. Must be from 0 up to, but not including, 0.5.
+  new_data_fraction: 0.05
+  # The file ingest.py writes for those patients, without the answer column.
+  # predict.py scores this file when you don't pass --input. It is rebuilt every
+  # time ingest runs.
+  new_data_path: data/new/new_synthetic_clinical_dataset.csv
+  # The answers for those same patients, in the same row order. predict.py uses
+  # it afterwards to score its predictions. It is never given to the model.
+  new_data_answers_path: data/new/new_synthetic_clinical_dataset_answers.csv
+
+# Rules the data must pass before it is used (checked in validate.py).
+validation:
+  # The smallest number of rows the dataset may have.
+  min_rows: 10
+  # Limits for columns other than the one in data.value_column, which has its own
+  # filter. A value below min or above max fails validation. Leave a limit out (or
+  # null) to leave that end open, and use {} for no limits. The limits below are wide
+  # "could this be a real reading?" bounds, assuming mg/dL for glucose, cholesterol
+  # and creatinine. Replace them with limits a clinician has signed off.
+  column_ranges:
+    bmi: {min: 10, max: 70}
+    systolic_bp: {min: 60, max: 260}
+    diastolic_bp: {min: 30, max: 160}
+    glucose: {min: 20, max: 600}
+    cholesterol: {min: 50, max: 500}
+    creatinine: {min: 0.2, max: 15}
+
+# Which columns the model uses and how the data is split (features.py).
+features:
+  # The input columns. The names must match the CSV header exactly, including
+  # capital letters. These are also checked for in validate.py, and the check
+  # lists every name it can't find.
+  #
+  # The model only accepts numbers, so text columns such as sex and diagnosis
+  # are left out until features.py encodes them. patient_id (an identifier) and
+  # mortality (it would leak the answer) are not in the data at all.
+  # In testing, age and glucose alone carried no signal for readmission, while
+  # hypertension, diabetes and creatinine did.
+  feature_columns:
+    - age
+    - sex
+    - bmi
+    - systolic_bp
+    - diastolic_bp
+    - glucose
+    - cholesterol
+    - creatinine
+    - diabetes
+    - hypertension
+  # Text columns to turn into 0/1 columns (one for each category except the
+  # first). List each column with its categories. The categories live here, not
+  # in the data, so training and prediction always produce the same columns. A
+  # value that isn't on the list stops the run with an error. sex becomes
+  # sex_Male (0 means Female). Keep this in step with data.allowed_values.
+  categorical_columns:
+    sex:
+      - Female
+      - Male
+  # New columns worked out from two existing ones: new_name: [first, second]
+  # means new_name = first minus second. Both columns must be in feature_columns.
+  # Pulse pressure is the gap between the top and bottom blood pressure numbers.
+  difference_columns:
+    pulse_pressure: [systolic_bp, diastolic_bp]
+  # Columns the model must never use. The run stops if one is listed in
+  # feature_columns. patient_id is only a label. mortality is an outcome that is
+  # recorded alongside readmission, so using it would leak the answer.
+  excluded_columns:
+    - patient_id
+    - mortality
+  # The one column the model learns to predict. The pipeline supports a single
+  # target column.
+  target_column: readmission_30d
+  # The share of rows held back for testing. 0.2 means 20 percent.
+  test_size: 0.2
+  # true keeps the same share of each target value (for example the readmitted
+  # rate) in both the training and the test rows. false uses a plain random
+  # split. It needs at least 2 rows of every target value.
+  stratify: true
+
+# The model and where it is saved (train.py).
+model:
+  # Where the trained model is written, and read back from by evaluate.py and predict.py.
+  path: artifacts/model.joblib
+  # Logistic regression settings. max_iter is the most steps the solver may take.
+  max_iter: 1000
+  # Regularisation strength. Smaller values mean stronger regularisation.
+  C: 1.0
+  # How much the model cares about each target value. "balanced" gives the
+  # rarer value more weight, so the model learns to flag readmitted patients
+  # instead of guessing "not readmitted" for everyone. Use null (no quotes) for
+  # no weighting.
+  class_weight: balanced
+
+# How the model is scored (evaluate.py).
+evaluation:
+  # How F1 is averaged across classes. "weighted" weights each class by how
+  # common it is. Other values scikit-learn accepts are "macro" and "micro".
+  # For a binary yes or no target, "binary" scores the positive class only.
+  average: weighted
+  # The target value that counts as the "positive" case. Precision, recall and
+  # AUC are worked out for this value. For readmission_30d, 1 means readmitted.
+  positive_label: 1
+  # Columns to report scores for, one group at a time (evaluate.py). The point is to
+  # see whether errors fall more heavily on some groups than others. Each value
+  # in the column becomes a group. Use [] for none. The dataset has no ethnicity
+  # or Aboriginal and Torres Strait Islander status column, so it can't be checked
+  # for those groups.
+  group_columns: [sex]
+  # Numeric columns to cut into bands before grouping: column: [band edges].
+  # age: [0, 40, 60, 80, 120] gives bands 0-40, 40-60, 60-80 and 80-120.
+  binned_columns:
+    age: [0, 40, 60, 80, 120]
+
+# Experiment tracking with MLflow (src/tracking.py). Train, evaluate and compare each
+# record a run: the settings, the scores, the files, and tags for the data, the
+# code commit and the config. Runs pile up so you can compare them over time.
+# Set enabled to false, or leave mlflow uninstalled, and the pipeline runs as normal.
+tracking:
+  enabled: true
+  # Where MLflow keeps its records. A sqlite file in the project folder is the
+  # simplest choice. Open the viewer with: mlflow ui --backend-store-uri sqlite:///mlflow.db
+  uri: sqlite:///mlflow.db
+  # The name runs are filed under.
+  experiment_name: clinical_readmission
+
+# Model comparison (compare.py). A baseline and candidate models are trained on the
+# same rows and scored on the same test rows, so you can see whether a model is
+# better than doing nothing clever.
+comparison:
+  # How many slices the training rows are cut into for cross-validation.
+  cv_folds: 5
+  # The baseline ignores the inputs and always predicts the commoner outcome
+  # (most_frequent). Any real model has to beat it.
+  baseline:
+    type: dummy
+    strategy: most_frequent
+  # Simple fixed rules a real model should beat. type rule flags a patient when
+  # the column is at or above the threshold. The column must be one of the
+  # encoded model inputs.
+  benchmarks:
+    rule_age_65:
+      type: rule
+      column: age
+      threshold: 65
+  # Models to compare. type is logistic or random_forest.
+  candidates:
+    logistic_regression:
+      type: logistic
+      max_iter: 1000
+      C: 1.0
+      class_weight: balanced
+    random_forest:
+      type: random_forest
+      n_estimators: 300
+      max_depth: 6
+      min_samples_leaf: 20
+      class_weight: balanced
+
+# Approval gate and model documentation (train.py and compare.py).
+approval:
+  # When true, train.py saves the model only if it passes the gate below.
+  enabled: true
+  # How much better than the do-nothing baseline the model's cross-validated AUC
+  # must be. Automating a threshold does not make it meaningful. Set it from the
+  # intended use and the cost of errors, and review it when the data or use changes.
+  min_auc_gain: 0.05
+  # Written beside the saved model: what it is, what built it, and the gate result.
+  model_card_path: artifacts/model_card.json
+  # Written by compare.py: the intended use, the results table and the recommendation.
+  evidence_path: reports/evaluation_evidence.md
+  # Text copied into the model card and the evidence record.
+  intended_use: >-
+    Help clinicians decide which adult inpatients get extra follow-up before
+    discharge, by ranking patients on their risk of readmission within 30 days.
+    A person makes the decision. The model only suggests.
+  not_for: >-
+    Automated decisions about care, any use on real patients, or any population
+    that differs from the synthetic training data.
+  known_limits:
+    - The data is synthetic, so the scores say nothing about real patients.
+    - Signal is weak. About three in four flagged patients are not readmitted.
+    - No date or site column, so a time-based or site-based check was not possible.
+    - Fairness was checked by sex and age band only. No ethnicity or Indigenous status data exists.
+    - Patients outside the age range 18 to 100 were removed, so the model says nothing about children.
+  recommendation: >-
+    Do not deploy clinically. Use the pipeline as a working example. Before any
+    real use, test on real data with a time-based split, check fairness across
+    the groups that matter, and have a named person approve the model.
+
+# The graphs (plots.py). Start it with: python -m src.plots
+# They are drawn from the same split, models and scores the other stages use, so
+# the numbers on the graphs match the tables in the reports.
+plots:
+  enabled: true
+  # The folder the PNG files are written to.
+  folder: reports/figures
+  # Picture sharpness. 150 suits a Word document.
+  dpi: 150
+  # One colour per model, in the order of the comparison table (baseline, rule
+  # benchmark, then each candidate). Add a colour if you add a model.
+  palette: ["#8A98A5", "#E0A100", "#0F8B8D", "#12263A"]
+  # The group graph shows recall and precision for these columns of the group
+  # table. The groups themselves come from evaluation.group_columns and binned_columns.
+  group_metrics: [recall, precision]
+
+# The prediction service (app.py). Start it with: python -m src.app
+service:
+  # 127.0.0.1 means only this computer can reach it. Use 0.0.0.0 to share it on your network.
+  host: 127.0.0.1
+  port: 8000
+  # The most patients one request may contain. Larger requests are refused.
+  max_patients: 100
+  # The banner picture at the top of the web form. Leave it out, or use null, for no banner.
+  header_image: assets/header_online.jpg
+  # The values the web form starts with: typical adult reference values for a
+  # healthy patient. Units are assumed to be mg/dL for glucose, cholesterol and
+  # creatinine, and the values are a starting point, not clinically signed off.
+  # Any column left out starts blank. Use {} to start every box blank.
+  form_defaults:
+    age: 40
+    sex: Female
+    bmi: 22
+    systolic_bp: 120
+    diastolic_bp: 80
+    glucose: 90
+    cholesterol: 180
+    creatinine: 0.9
+    diabetes: 0
+    hypertension: 0
+
+# Where the results are written (evaluate.py and predict.py).
+outputs:
+  metrics_path: reports/metrics.json
+  predictions_path: reports/predictions.csv
+  # The name of the new column predict.py adds to the scored rows.
+  prediction_column: prediction
+  # Where each stage saves what it prints, as an RTF file you can open in Word.
+  # The text {stage} is replaced with the stage name (ingest, validate, train,
+  # evaluate or predict), so each stage gets its own file. Change the folder or
+  # the name here. Leave it blank ("") to print to the screen instead.
+  rtf_path: reports/{stage}_output.rtf
+  # The table of baseline and candidate scores written by compare.py.
+  comparison_path: reports/model_comparison.csv
+  # The encoded features the model is built from (sex as 0/1, pulse pressure and
+  # the rest), with the target and a column saying train or test. It is written by
+  # train.py so you can open it and see exactly what the model saw. It is for
+  # inspection only: nothing reads it back, so it can't make training and
+  # prediction drift apart.
+  features_path: data/processed/features.csv
+
+# Settings used only when the tests run (pytest).
+testing:
+  # The same idea as outputs.rtf_path, but for test runs. It is a different
+  # folder, so running the tests never overwrites the RTF files from a real run.
+  rtf_path: reports/test/{stage}_output.rtf

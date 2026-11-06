@@ -1,0 +1,50 @@
+# Everything the project can use, in one file. Install with:
+#   pip install -r requirements.txt
+#
+# The core pipeline needs only the Runtime and Testing sections. The other
+# sections are optional: the pipeline runs without them, and the tests for them
+# are skipped when the library is missing. Delete the lines you don't want.
+
+# Runtime
+pandas>=2.0
+scikit-learn>=1.3
+joblib>=1.3
+pyyaml>=6.0
+
+# Testing
+pytest>=7.0
+
+# Experiment tracking (src/tracking.py). Set tracking.enabled to false in
+# config.yaml to turn it off. This uses mlflow-skinny, the recording part of
+# MLflow, and not the full mlflow package. Full mlflow needs pyarrow, which has
+# no Windows on ARM build, so its install fails there. To open the MLflow web
+# page as well, see "Track runs with MLflow" in the README.
+mlflow-skinny==3.18.0
+# cryptography is pulled in by mlflow-skinny (through databricks-sdk and google-auth).
+# Pinned because 46.0.3 is the newest release with a Windows on ARM wheel. Newer
+# ones ship source only there, and pip then tries a Rust build that fails.
+cryptography==46.0.3
+sqlalchemy>=1.4
+alembic>=1.8
+
+# Data and pipeline versioning (dvc.yaml). Only needed to run "dvc repro".
+dvc
+
+# MLflow web page (mlflow ui). These are the libraries its server needs. The page
+# files themselves come from one extra command, see "Track runs with MLflow" in the README.
+Flask
+Flask-CORS
+graphene
+docker
+huey
+skops
+waitress
+aiohttp
+
+# Prediction service (python -m src.app)
+fastapi
+uvicorn
+httpx
+
+# Scatterplot (python -m src.plots)
+matplotlib>=3.7

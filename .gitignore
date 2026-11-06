@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Project outputs (keep the folders, ignore the contents)
+data/*
+!data/.gitkeep
+
+# DVC: let Git see the .dvc pointer files in data/raw, but not the data itself
+!data/raw/
+data/raw/*
+!data/raw/*.dvc
+!data/raw/.gitignore
+artifacts/*
+!artifacts/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# MLflow tracking store (local)
+mlflow.db
+mlruns/
+
+# Secrets and local config
+.env
+*.key
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Stray files
+.Rhistory
+README.html
