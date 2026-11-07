@@ -95,6 +95,16 @@ A download waits `download_timeout` seconds per attempt and tries up to `downloa
 
 Each run prints the source type, the location, the time and a short fingerprint of the file at the top of `reports/ingest_output.rtf`. The same bytes always give the same fingerprint, so two runs can be compared. `python -m src.ingest --input some/file.csv` still reads a local file and overrides the config.
 
+## Getting the raw data
+
+The raw dataset isn't in this repository. Git ignores it and DVC tracks it, and there is no DVC remote, so a fresh clone has no copy. It comes from Kaggle: [Clinical Dataset](https://www.kaggle.com/datasets/uom190346a/synthetic-clinical-tabular-dataset), described there as a clinical dataset mimicking real-world patient records. The data is synthetic.
+
+1. Download the CSV from the Kaggle page. Kaggle needs a free account.
+2. Save it as `data/raw/synthetic_clinical_dataset.csv`. Rename it if the downloaded file has a different name.
+3. Run `python -m src.ingest`, then the other stages in the table above.
+
+The Kaggle page doesn't state a licence or a file layout, so check the page's terms before reusing the data. If the file's columns differ from `data.keep_columns` in `config.yaml`, ingest and validate stop with a message naming what's missing.
+
 ## Configure
 
 The settings you're most likely to touch:
@@ -208,7 +218,7 @@ The graphs use the same split, folds, models and group bands as `train`, `evalua
 python -m src.app
 ```
 
-Then open `http://127.0.0.1:8000/` for a form where you enter one patient's predictors and it answers "Possible readmission after 30 days: Yes" or "No". The form is built from `features.feature_columns` and `features.categorical_columns`, so it always matches the model's inputs. It starts with typical healthy adult values from `service.form_defaults` in `config.yaml` (assumed mg/dL units, not clinically signed off). Change them there, or set `{}` to start with blank boxes. The banner picture at the top is `assets/header.jpg`, set by `service.header_image`. Set it to `null` for no banner. Open `http://127.0.0.1:8000/docs` for a test page where you can send patients to the API directly. No Docker is needed. The host, port and the most patients per request are in the `service` section of `config.yaml`.
+Then open `http://127.0.0.1:8000/` for a form where you enter one patient's predictors and it answers "Possible readmission after 30 days: Yes" or "No". The form is built from `features.feature_columns` and `features.categorical_columns`, so it always matches the model's inputs. It starts with typical healthy adult values from `service.form_defaults` in `config.yaml` (assumed mg/dL units, not clinically signed off). Change them there, or set `{}` to start with blank boxes. The banner picture at the top is `assets/header_online.jpg` (the earlier banners are still in `assets/header.jpg` and `assets/header_hospital.jpg`), set by `service.header_image`. Set it to `null` for no banner. Open `http://127.0.0.1:8000/docs` for a test page where you can send patients to the API directly. No Docker is needed. The host, port and the most patients per request are in the `service` section of `config.yaml`.
 
 | Request | What it does |
 |---|---|
@@ -266,7 +276,7 @@ dvc init
 git add .dvc .dvcignore
 git commit -m "Initialise DVC"
 dvc add data/raw/synthetic_clinical_dataset.csv
-git add data/raw/synthetic_clinical_dataset.csv.dvc data/raw/.gitignore
+git add data/raw/synthetic_clinical_dataset.csv.dvc
 git commit -m "Track raw data with DVC"
 dvc repro
 dvc metrics show
