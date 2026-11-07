@@ -44,7 +44,7 @@ import pandas as pd
 
 from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep, subPrintPiplineHeader,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintPiplineHeader,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.ingest import dfLoadCsv
 
@@ -280,38 +280,6 @@ def subMain() -> None:
         bDisplayDatasetDetails(dfData) # Display the details for the dataset
         dfValidate(dfData, dctConfig)  # Raises ValidationError (and stops the script) on a failure.
         print(f"{len(dfData)} rows passed validation")
-
-        # Passing validation above is the evidence. List the rules this stage checks.
-        # Prints this step, in bold italic, into the RTF file. Write your answer between
-        # the quotes on the second line. Use triple quotes if it runs over several lines.
-        subPrintStep(
-            "Step 1 - Pipeline architecture diagram: describe data validation.",
-            "Step 2 - Add checks for relevant data-quality problems, such as: missing or unexpected columns; incorrect data types; missing values; invalid value ranges; duplicate rows; categories outside an expected set; date or time values that cannot be parsed.",
-        )
-
-        # The rules in dfValidate ran above. Say which of these problems each rule covers and which it does not.
-        subPrintStep(
-            "Step 2 - Add checks for relevant data-quality problems, such as: missing or unexpected columns; incorrect data types; missing values; invalid value ranges; duplicate rows; categories outside an expected set; date or time values that cannot be parsed.",
-            "The checks test for unexpected columns, missing and wrong data types, missing values, out of range values, duplicate rows and values that are not in the allowed categories. Check 2 fails the run if a feature column or the target column is missing. Check 9 fails any column that ingest does not keep. Check 10 checks if all numeric feature columns only hold numbers. Check 4 counts missing values. Check 6 checks the values for the column “age” against 18 to 100. Check 11 checks the values for the columns “BMI”, “blood_pressure”, “glucose”, “cholesterol” and “creatinine” against the limits in the config file. Check 5 tests the values for the column “sex” against the allowed list of values. Check 7 counts the number of duplicate rows. Check 8 fails if the target column is not 0 or 1. There are no date or time columns in the dataset.",
-        )
-
-        # Validation is one automated check. The pytest tests and the CI workflow are the others.
-        subPrintStep(
-            "Step 5 - Add automated quality checks through tests, validation scripts, continuous integration workflows or another justified approach.",
-            "Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 175 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file, so be careful when editing config.yaml as you may break the tests. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.",
-        )
-
-        # Describe .github/workflows/ci.yml: when it runs and what it runs.
-        subPrintStep(
-            "Step 5 - Where appropriate, configure a workflow such as GitHub Actions to run selected checks automatically.",
-            "A GitHub Actions workflow (.github/workflows/ci.yml) runs all the tests automatically on a clean GitHub-hosted machine (separate from my dev box). The workflow installs all required libraries from requirements.txt and then runs python -m pytest tests. All failing test cases of the executed test suite will then turn the complete run red on the Actions tab. Note that this workflow only runs tests and does not run the full pipeline. DVC manages the raw data, and thus it is not stored in Git.",
-        )
-
-        # The validation rules above stop the run when the data changes shape. Say what happens next and who is told.
-        subPrintStep(
-            "Step 6 - Identify operational risks, such as changes to data formats and failed validation checks.",
-            "If the supplier changes the data format (i.e. renaming or removing columns), it will fail validation check 2, and the pipeline stops. An extra column will fail validation check 9. Text in a numeric column or an impossible value will fail on validation checks 10 and 11. All of these problems will surface in one message. Nothing will alert a person that a run has failed, so they will have to read the run report to determine this. The limits in the config.yaml also carry risk. If the limits are set too high or low, it could allow bad data through. Slow drift in values within the defined limits will not fail any checks.",
-        )
 
 
 if __name__ == "__main__":

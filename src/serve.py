@@ -7,7 +7,7 @@
 
     Course: AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS
 
-    app.py
+    serve.py
 
     The prediction service: the saved model behind a small web API (FastAPI).
 
@@ -29,7 +29,7 @@
     must not be used to make decisions about real patients.
 
     Run from the project root (needs: pip install -r requirements.txt):
-        python -m src.app
+        python -m src.serve
     then open http://127.0.0.1:8000/ for the form, or http://127.0.0.1:8000/docs
     to try the API directly.
 """

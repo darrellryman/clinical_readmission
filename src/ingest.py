@@ -62,7 +62,7 @@ from sklearn.model_selection import train_test_split
 from src.config import subAddConfigArgument, dctLoadConfig
 
 # The shared function that prints a profile of the data.
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep, subPrintPiplineHeader,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintPiplineHeader,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 
 def dfLoadCsv(varPath) -> pd.DataFrame:
@@ -458,36 +458,6 @@ def subMain() -> None:
         print(f"\n{STR_BOLD}{STR_UNDERLINE}RAW DATA{STR_RESET}")
         bDisplayDatasetDetails(dfData)
 
-        # The profile above is the evidence for the raw data and where it came from.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 1 - {STR_RESET}{STR_ITALIC}Pipeline architecture diagram: describe the raw data and its source.{STR_RESET}",
-            "The raw data is stored in one CSV file called synthetic_clinical_dataset.csv, which is defined in the config in data.raw_path. The data includes 10,000 rows (one per patient) and 14 columns in total. Six columns are integers, six are decimals, and two are text (sex and diagnosis). The data profile shows no missing values and no duplicate rows. The input variables for the tool are age, sex, BMI, systolic and diastolic blood pressure, glucose, cholesterol, creatinine, diabetes and hypertension. Diagnosis is a text column that stays in the cleaned file but is not used as an input. The target variable is readmission_30d, indicating an average of about 14% of patients were readmitted within 30 days. Mortality is a competing endpoint and would leak information if used as an input variable. The patient_id variable is a label and thus not used as an input variable. The data profile also reveals a problem that will surface later. Age has a minimum value of 0, meaning some records must be for newborns or children. The tool is designed to work with adult inpatients and thus the ingest filters on age.",
-        )
-
-        # dfLoadCsv above loads the raw data from the path in config.yaml, the same way every run.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 2 - {STR_RESET}{STR_ITALIC}Implement a repeatable process for loading the raw data from a file, URL or other defined source.{STR_RESET}",
-            "One function, tplLoadRawData, loads the raw data and reads its settings from the config, so every run loads the data the same way. data.source determines the data source (i.e., whether it is a file or a web address). For files, the raw data is read from data.raw_path. For web addresses, the raw data is downloaded from data.raw_url to the specified path. The download is saved with a temporary file name. Only when the download has completed is the temporary file name replaced with the final file name. Should the download fail for some reason or the resulting file be empty, the run is terminated with a message indicating the problem with the web address or file specified for the test case. In the run report, each run is described by the data source, the location from which the data was loaded, the time it was loaded, and a short file fingerprint. In this case, a local file was read as specified in the config.",
-        )
-
-        # dfLoadCsv above reads one file at a fixed path. Say what happens if that file is late, missing or empty.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Identify operational risks, such as unavailable or delayed data.{STR_RESET}",
-            "The biggest risk is that the raw data for a given file is missing or late. For files the system tries to download, if the file or associated web address is unavailable, or if the file is empty, the system will retry the download a number of times, then stop and provide a clear message. Late data is a gap that currently is not addressed. While load time and a file fingerprint are recorded after ingestion, nothing currently checks how old the file is; as a result, a file could be stale and used without warning. A changed layout is a third risk. If the dataset column changes, the Ingest stops when it can’t find a column listed in the config.",
-        )
-
-        # The raw data above is where data authority starts. Say who owns this data and whose consultation would be needed.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Consider cultural safety, data authority and the need for consultation where the data, prediction or proposed use could affect Aboriginal and Torres Strait Islander peoples, communities, Country or knowledge.{STR_RESET}",
-            "The dataset lacks a column (or combination of columns) that allows identification of Indigenous people. Therefore, it is not possible to evaluate how the model is treating Aboriginal and Torres Strait Islander patients. The dataset would need to include data so performance can be reported for First Nations patients, and any use would need to demonstrate a collective benefit for that community/communities. Regarding authority to control use of the data, this would sit with the relevant Aboriginal community and their health service (e.g., an Aboriginal Community Controlled Health Organisation), as well as the hospital’s data governance and an ethics committee with appropriate Aboriginal representation.",
-        )
-
-        # The dataset is synthetic and has no ethnicity or Indigenous status column. Say what a real setting would add.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Where cultural safety issues are not directly evident in the selected dataset, explain what would still need to be considered before applying the system in a real organisational or community setting.{STR_RESET}",
-            "Although there are no issues with cultural safety identified in this data, a real hospital would record a patient’s self-identified Indigenous status, enabling the model to be checked for Aboriginal and Torres Strait Islander patients. The organisation would also need to consult with and obtain approval from the local Aboriginal community and their health service on how the data will be collected, stored, and used. Patients and staff must be informed that the model exists, how individuals will be flagged, and who can overturn a patient's flagging, with follow-up actions that are culturally safe (e.g. involving Aboriginal health workers). I would also like to set up a review after the system goes live to identify whether any groups have been under-flagged by the model, and to inform the community and organisation so they can take appropriate action where required.",
-        )
-
         # Keep only the columns listed in config.yaml, then clean what is left.
         intRawRows = len(dfData)
         dfData = dfKeepColumns(dfData, dctConfig["data"]["keep_columns"])
@@ -521,55 +491,6 @@ def subMain() -> None:
                   f"as new patients. Questions: {pthNewFile}. Answers: {pthAnswersFile}")
         else:
             print("No patients were set aside as new patients (data.new_data_fraction is 0).")
-
-        # Section 1, step 1. The purpose of the system. This sits below the row counts above
-        # so the numbers it quotes are printed first.
-        # Prints this step, in bold italic, into the RTF file. Write your answer between
-        # the quotes on the second line. Use triple quotes if it runs over several lines.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 1 - {STR_RESET}{STR_ITALIC}Define the problem that the AI system addresses and the prediction or decision it is intended to support.{STR_RESET}",
-            "Some patients are discharged from the hospital only to return within 30 days. Such readmissions are often stressful for patients and can be costly for hospitals. By predicting readmission among adult inpatients at discharge, the system supports clinicians' decisions about allocating patient follow-up. They can decide whether a patient needs a phone call, a medication review, or an early appointment with the patient’s General Practitioner. A missed readmission is more expensive than a false alarm. The data used for this working example is synthetic and thus should not be used for real-world patients.",
-        )
-
-        print(f"\n{STR_BOLD}{STR_UNDERLINE}Criteria for Omission{STR_RESET}")
-        print(f"\nRows removed outside of allowed values {dctConfig['data']['allowed_values']}")
-        print(f"\nRows removed outside of minimum value ({dctConfig['data']['min_value']})," 
-             f" maximum value ({dctConfig['data']['max_value']})\n")
-
-        # Section 1, step 3. Who uses the prediction and who is affected.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 1 - {STR_RESET}{STR_ITALIC}Explain who might use the prediction and who may be affected by the system.{STR_RESET}",
-            "This application is intended for use on adult inpatients. Ingest removes patients outside the age range specified in the config (18 to 100 years of age) and patients whose sex is not on the allowed list in the config (Female or Male). Thus, patients outside these criteria are not covered by this system at all. Direct users of this system are the people planning discharge from hospital of the patients covered by this system: ward doctors, ward nurses, hospital discharge planners and hospital care co-ordinators. In addition, hospital managers and quality assurance personnel will use the totals generated by this application to plan for the follow-up care of their patients. Patients, families and carers of patients will also be affected. As patients who have been flagged for follow-up are passed from hospital to community based primary care and tertiary care, the flagged patients become the workload of GPs and community based nurses.",
-        )
-
-        print(f"\n{STR_BOLD}{STR_UNDERLINE}Records Removed from Dataset{STR_RESET}")
-        print(f"\nRows removed outside of allowed values {dctConfig['data']['allowed_values']}: {intAfterClean - intAfterValues}")
-        print(f"\nRows removed outside of minimum value ({dctConfig['data']['min_value']}), "
-             f"maximum value ({dctConfig['data']['max_value']}): {intAfterValues - intCleanRows}\n")
-
-        # The answer to the who-uses question above, widened to everyone the system touches.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Identify the users, affected stakeholders and people or communities who could benefit from or be harmed by the system.{STR_RESET}",
-            "Patients identified as high risk for readmission can benefit from a flag that prompts follow-up that would otherwise be missed. Clinicians can benefit from a consistent prompt to support their clinical judgement. The hospital can benefit from fewer avoidable readmissions and improved bed management through reduced length of stay. However, some patient groups also face potential harm. Patients the model does not identify as at risk may receive less appropriate care than others with similar needs if clinicians rely on the flag. Similarly, patients who are incorrectly flagged as being at risk and undergo additional contact as a result could experience significant anxiety for no reason. This model does not cover children. The ingest summary for this model shows that 204 rows outside of the age range of (18 to 100) were removed. In this data, these are the under-18s, so the model says nothing about them and must not be applied to them. The summary also shows that 116 rows outside of the allowed values for sex (Female, Male) were removed. In this data, these are patients whose sex is recorded as Other. There were too few of them to score fairly, and the model only knows two categories, so the model says nothing about them either and must not be applied to them. Removing them also means any bias against this group could not be detected. Older patients may also be served least well, because small groups give very unreliable scores. The dataset for this model does not have columns for ethnicity or Indigenous status. Therefore, Aboriginal and Torres Strait Islander peoples and other ethnic communities will not be able to determine whether or not they are receiving different treatment as a result of this model. People in rural and remote areas may also be disadvantaged, as follow-up services and other services required for the model's output may be difficult to access in these locations. Any use of this model would require consultation with the communities of concern and a clear data owner before the model can access patients' health information.",
-        )
-
-        # The row counts above are the evidence for what ingestion did.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 1 - {STR_RESET}{STR_ITALIC}Pipeline architecture diagram: describe data ingestion.{STR_RESET}",
-            "The stage of ingestion is ingest.py. This is the only stage that actually reads the raw file. It reads a file specified in the config (e.g. a local file or a web page) and keeps only the columns listed in the config. It removes duplicates, then rows that are outside of the sex specified in the config and age outside of 18-100. It holds out 5% of the remaining patients as “new patients” and writes their answers to a file; it then writes the rest of the cleaned data to a file that the remaining stages read from. For each run of the stages, it prints where the data came from, when it was loaded, and a “fingerprint” of the file, so later stages and a human can tell where the data came from.",
-        )
-
-        # The cleaning and filtering above, and the counts printed, are the evidence for how bad rows are handled.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 2 - {STR_RESET}{STR_ITALIC}Describe how invalid or incomplete data is handled.{STR_RESET}",
-            "The Ingest stage of the pipeline removes invalid rows and reports how many. Spaces are stripped from string columns, duplicates are removed, and rows are removed where the sex is not Female or Male (116) and outside the age range of 18 to 100 (204), and the counts are printed above. The raw data had no missing values. The pipeline never fills in gaps or ‘guesses’ values in any of the stages. The Validate stage checks the file after cleaning and stops the pipeline if there are any problems with the cleaned data. The Validate stage stops at once if the table is empty or a required column is missing. Otherwise it runs the remaining checks together and reports every problem in one message: too few rows, missing values in a required column, a value outside the allowed list for sex, an age outside the range, duplicate rows, and a target that is not 0 or 1. The feature stage also refuses any category that is not on the config list, so bad data is stopped as early as possible before it causes problems later in the pipeline.",
-        )
-
-        # The cleaned profile above shows what the data does and doesn't hold. Think about synthetic values, clipped ranges and 0 ages.
-        subPrintStep(
-            f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Discuss limitations in the data, features, model and evaluation (the data).{STR_RESET}",
-            "There are no date or site columns, so data cannot be split into training and test data for different times or sites. A random split of the data will likely overstate how well the model works in practice. There are no columns for Indigenous status or ethnicity, so fairness can only be assessed by sex and age. The average readmission rate is about 14%. Due to this strongly imbalanced class distribution, the results must be interpreted with caution.",
-        )
 
 
 # This block only runs when the file is executed directly (python -m src.ingest).

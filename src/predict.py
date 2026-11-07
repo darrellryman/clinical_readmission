@@ -33,7 +33,7 @@ import pandas as pd
 
 from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.evaluate import dctComputeMetrics
 from src.features import dfRawInputs
@@ -113,50 +113,6 @@ def subMain() -> None:
                 print(f"\nSCORES ON {len(dfResult)} NEW PATIENTS (answers kept apart from the model): {dctNewScores}")
             else:
                 print("The answers file has a different number of rows from the new patients file, so it was not used.")
-
-        # The predictions above came from the saved model and the shared feature function.
-        # Prints this step, in bold italic, into the RTF file. Write your answer between
-        # the quotes on the second line. Use triple quotes if it runs over several lines.
-        subPrintStep(
-            "Step 1 - Pipeline architecture diagram: describe the reusable prediction workflow.",
-            "",
-        )
-
-        # What would you watch once this runs for real: input drift, the readmission rate, recall over time.
-        subPrintStep(
-            "Step 1 - Pipeline architecture diagram: describe monitoring considerations.",
-            "",
-        )
-
-        # Think about input drift, the readmission rate, recall over time and how often validation fails.
-        subPrintStep(
-            "Step 6 - Explain what should be monitored if the system were used beyond the project.",
-            "",
-        )
-
-        # python -m src.predict wrote the predictions above for the new data file.
-        subPrintStep(
-            "Step 5 - Provide a script, command or clearly identified notebook section that can generate predictions for new data.",
-            "",
-        )
-
-        # predict.py calls the same dfEngineerFeatures as training. Show it, for example with a test or a worked row.
-        subPrintStep(
-            "Step 5 - Demonstrate that the prediction workflow applies the same preprocessing and feature logic used during training.",
-            "",
-        )
-
-        # Think about serving, monitoring, retraining, approval and data access.
-        subPrintStep(
-            "Step 5 - Explain what would be needed to extend the workflow into a production deployment.",
-            "",
-        )
-
-        # The predictions above came from one batch. Say what you would check on each new batch before trusting it.
-        subPrintStep(
-            "Step 6 - Identify operational risks, such as missing inputs, model or data drift, and predictions outside expected ranges.",
-            "",
-        )
 
 
 if __name__ == "__main__":

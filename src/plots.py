@@ -46,7 +46,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import precision_recall_curve, roc_auc_score, roc_curve
 
 from src.config import subAddConfigArgument, dctLoadConfig
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.evaluate import dfBuildGroups, dfConfusionCounts, dfMetricsByGroup
 from src.features import tplBuildFeatures, lstSplitData, dfRawInputs
@@ -340,12 +340,6 @@ def subMain() -> None:
         print("Graphs written:")
         for pthFile in lstPaths:
             print(f"  {pthFile}")
-
-        # The graphs are the evidence. Say what each one shows and what it means for use.
-        subPrintStep(
-            "Step 3 - Evaluate the models using at least one metric suited to the prediction task.",
-            "",
-        )
 
 
 if __name__ == "__main__":

@@ -27,7 +27,8 @@ Each stage is its own program. They pass results to each other through files.
 | Compare | `python -m src.compare` | Trains a baseline, a simple age rule and two candidate models on the same rows, writes one comparison table, and writes an evaluation evidence record |
 | Predict | `python -m src.predict` | Scores the new patients with the saved pipeline, and checks the predictions against their kept-apart answers |
 | Plots | `python -m src.plots` | Optional. Draws four evidence graphs into `reports/figures/`: ROC and precision-recall curves, cross-validated AUC per fold, the error-count grid, and recall and precision by group. See [Graphs](#graphs) |
-| Serve | `python -m src.app` | Optional. Serves the saved model as a web API (FastAPI). See [Prediction service](#prediction-service) |
+| Answer evidence | `python -m src.answers_evidence` | Run it last. Prints every assessment answer with the evidence that supports it, in pipeline order, into one report. Reads the data, the saved model, the comparison table and MLflow. Trains and writes nothing |
+| Serve | `python -m src.serve` | Optional. Serves the saved model as a web API (FastAPI). See [Prediction service](#prediction-service) |
 
 Run each one from the project root, in this order. Every program takes `--help`. A command line option such as `--input` or `--output` overrides the matching config value for that one run.
 
@@ -57,7 +58,8 @@ clinical_readmission/
     compare.py        baseline, rule and candidates, and the evidence record
     tracking.py       records runs in MLflow (optional)
     predict.py        scores new data
-    app.py            the prediction service (FastAPI), optional
+    serve.py          the prediction service (FastAPI), optional
+    answers_evidence.py   the assessment answers, each below its evidence
     check_setup.py    reports which packages and programs are installed
   tests/              pytest tests
   artifacts/          the saved model and its model card (not committed)
@@ -194,7 +196,7 @@ The graphs use the same split, folds, models and group bands as `train`, `evalua
 ## Prediction service
 
 ```
-python -m src.app
+python -m src.serve
 ```
 
 Then open `http://127.0.0.1:8000/` for a form where you enter one patient's predictors and it answers "Possible readmission after 30 days: Yes" or "No". The form is built from `features.feature_columns` and `features.categorical_columns`, so it always matches the model's inputs. It starts with typical healthy adult values from `service.form_defaults` in `config.yaml` (assumed mg/dL units, not clinically signed off). Change them there, or set `{}` to start with blank boxes. The banner picture at the top is `assets/header_online.jpg`, set by `service.header_image`. Set it to `null` for no banner. Open `http://127.0.0.1:8000/docs` for a test page where you can send patients to the API directly. No Docker is needed. The host, port and the most patients per request are in the `service` section of `config.yaml`.
@@ -207,7 +209,7 @@ Then open `http://127.0.0.1:8000/` for a form where you enter one patient's pred
 
 The request format is built from the config, so it always matches the model's inputs. A missing field, an extra field, a wrong type or a sex value that isn't on the list is refused with a 422 error before it reaches the model. Accepted patients go to the saved pipeline, which builds the engineered columns itself, as it did in training. The service stops at start-up if there is no saved model.
 
-It is a demonstration. The model is trained on synthetic data and must not be used for real patients. The tests in `tests/test_app.py` need the service libraries and are skipped if they aren't installed.
+It is a demonstration. The model is trained on synthetic data and must not be used for real patients. The tests in `tests/test_serve.py` need the service libraries and are skipped if they aren't installed.
 
 ## Output files
 
@@ -232,7 +234,8 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 | compare | `model_comparison.csv` | `reports/` | One row per model (baseline, age rule, logistic regression, random forest): role, type, cross-validated AUC mean and spread, and the test scores. |
 | compare | `evaluation_evidence.md` | `reports/` | One-page evidence record: intended use, not-for list, results table, recommended model, limits and recommendation. |
 | predict | `predictions.csv` | `reports/` | The new patients' columns plus a prediction column (the model's 0 or 1 for each patient). |
-| ingest, validate, train, evaluate, compare, plots, predict | `{stage}_output.rtf (7 files, for example train_output.rtf)` | `reports/` | Everything each stage prints, saved as a Rich Text file instead of shown on screen, including the bold italic assessment steps and their answers. Each run overwrites its own file. |
+| ingest, validate, train, evaluate, compare, plots, predict | `{stage}_output.rtf (7 files, for example train_output.rtf)` | `reports/` | Everything each stage prints, saved as a Rich Text file instead of shown on screen. Each run overwrites its own file. |
+| answers_evidence | `answer_evidence_output.rtf` | `reports/` | Every assessment answer in bold italic, each below the evidence that supports it, in pipeline order. Each run overwrites it. |
 | **Graphs** | | | |
 | plots | `1_roc_pr.png` | `reports/figures/` | ROC and precision-recall curves for each model. |
 | plots | `2_cv_spread.png` | `reports/figures/` | Cross-validated AUC for each fold, by model. |
@@ -253,7 +256,7 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 python -m pytest tests
 ```
 
-183 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
+188 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
 
 ## Track runs with MLflow
 
@@ -277,7 +280,7 @@ Tracking is optional. Set `tracking.enabled: false` in `config.yaml`, or leave `
 
 ## Reproduce with DVC
 
-`dvc.yaml` describes six stages: ingest, validate, train, evaluate, compare and plots. DVC needs a Git repository to start, so run `git init` first. With DVC installed, from the project root:
+`dvc.yaml` describes seven stages: ingest, validate, train, evaluate, compare, plots and answers_evidence. DVC needs a Git repository to start, so run `git init` first. With DVC installed, from the project root:
 
 ```
 git init
@@ -295,7 +298,7 @@ If the folder is already a Git repository, skip `git init`. Git asks for a name 
 
 `dvc repro` reruns only the stages whose inputs changed. After a config change, `dvc metrics diff` shows how the scores moved. `predict` isn't a DVC stage, because it needs a new-patients file that you supply.
 
-Without DVC, run the six commands in the table above, in order.
+Without DVC, run the seven commands in the table above, in order.
 
 ## Predict on new patients
 

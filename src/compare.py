@@ -47,7 +47,7 @@ import pandas as pd
 
 from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep, subPrintPiplineHeader,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintPiplineHeader,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 # Records each model as a run in MLflow when tracking is on.
 from src.tracking import bLogRun
@@ -259,80 +259,6 @@ def subMain() -> None:
                 lstArtifacts=[pthOut, pthEvidence],
                 dctTags={"role": serRow["role"]},
             )
-
-        # The table above is the evidence. Say what the baseline and candidates show.
-        # Prints this step, in bold italic, into the RTF file. Write your answer between
-        # the quotes on the second line. Use triple quotes if it runs over several lines.
-        subPrintStep(
-            "Step 1 - Pipeline architecture diagram: describe model evaluation and benchmarking (the baseline and candidate comparison).",
-            "",
-        )
-
-        # The whole pipeline has run by now. Describe the architecture diagram (the image goes in the README).
-        subPrintStep(
-            "Step 1 - Create a pipeline architecture diagram showing: raw data and its source, data ingestion, data validation, feature engineering and preprocessing, model training, model evaluation and benchmarking, versioning and experiment or artefact tracking, model saving or approval, the reusable prediction workflow, and monitoring considerations.",
-            "",
-        )
-
-        # Tie the answer to this task: rare readmissions, a shared feature function, config-held exclusions.
-        subPrintStep(
-            "Step 1 - Explain why the proposed architecture is suitable for your prediction task rather than presenting a generic machine learning pipeline.",
-            "",
-        )
-
-        # The baseline row in the table above is a dummy classifier that always predicts the commoner outcome.
-        subPrintStep(
-            "Step 3 - Train a simple baseline model, such as a dummy classifier, dummy regressor, historical average, persistence model or existing-rule benchmark.",
-            "",
-        )
-
-        # The logistic regression and random forest rows in the table above are the candidates.
-        subPrintStep(
-            "Step 3 - Train at least one candidate machine learning model.",
-            "",
-        )
-
-        # Every model was given the same engineered features and the same split, shown above.
-        subPrintStep(
-            "Step 3 - Apply preprocessing consistently to the baseline and candidate models where appropriate.",
-            "",
-        )
-
-        # Read the baseline and candidate rows of the table above side by side.
-        subPrintStep(
-            "Step 3 - Compare the candidate model with the baseline.",
-            "",
-        )
-
-        # Say what the numbers mean for readmission prediction, not just what they are.
-        subPrintStep(
-            "Step 3 - Interpret the results rather than reporting metric values alone.",
-            "",
-        )
-
-        # Think about synthetic data, one split, the threshold and what AUC does not tell you.
-        subPrintStep(
-            "Step 3 - Discuss limitations of the evaluation, including what the results do and do not establish.",
-            "",
-        )
-
-        # The table above is from one split of synthetic data. Say what it does and does not establish.
-        subPrintStep(
-            "Step 6 - Discuss limitations in the data, features, model and evaluation (the model and the evaluation).",
-            "",
-        )
-
-        # The README and Git guide hold the steps. Summarise them here.
-        subPrintStep(
-            "Step 4 - Provide sufficient set-up and run instructions for another person to reproduce the result.",
-            "",
-        )
-
-        # Each stage is a python -m command, and dvc.yaml runs them all with dvc repro.
-        subPrintStep(
-            "Step 5 - Provide repeatable commands or scripts for running the main stages of the pipeline.",
-            "",
-        )
 
 
 if __name__ == "__main__":

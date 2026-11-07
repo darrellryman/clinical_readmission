@@ -41,7 +41,7 @@ skops
 waitress
 aiohttp
 
-# Prediction service (python -m src.app)
+# Prediction service (python -m src.serve)
 fastapi
 uvicorn
 httpx

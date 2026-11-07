@@ -278,7 +278,7 @@ plots:
   # table. The groups themselves come from evaluation.group_columns and binned_columns.
   group_metrics: [recall, precision]
 
-# The prediction service (app.py). Start it with: python -m src.app
+# The prediction service (serve.py). Start it with: python -m src.serve
 service:
   # 127.0.0.1 means only this computer can reach it. Use 0.0.0.0 to share it on your network.
   host: 127.0.0.1
