@@ -17,14 +17,14 @@ import pandas as pd
 import pytest
 
 from src.evaluate import dctComputeMetrics
-from src.features import tplBuildFeatures
+from src.features import dfRawInputs, tplBuildFeatures
 from src.predict import dfPredict
 from src.train import mdlBuildModel, mdlLoadModel, pthSaveModel, mdlTrainModel
 
 
 def test_train_and_predict(dfSample, dctConfig):
     """A trained model can score data, and the output gains a prediction column."""
-    dfX, serY = tplBuildFeatures(dfSample, dctConfig)
+    dfX, serY = dfRawInputs(dfSample, dctConfig), tplBuildFeatures(dfSample, dctConfig)[1]
     mdlModel = mdlTrainModel(dfX, serY, dctConfig)
     dfResult = dfPredict(mdlModel, dfSample, dctConfig)
     assert "prediction" in dfResult.columns
@@ -35,15 +35,15 @@ def test_model_settings_come_from_the_config(dfSample, dctConfig):
     """The model is built with the values in the config's model section."""
     dctConfig["model"]["max_iter"] = 250
     dctConfig["model"]["C"] = 0.5
-    dfX, serY = tplBuildFeatures(dfSample, dctConfig)
+    dfX, serY = dfRawInputs(dfSample, dctConfig), tplBuildFeatures(dfSample, dctConfig)[1]
     mdlModel = mdlTrainModel(dfX, serY, dctConfig)
-    assert mdlModel.max_iter == 250
-    assert mdlModel.C == 0.5
+    assert mdlModel.named_steps["model"].max_iter == 250
+    assert mdlModel.named_steps["model"].C == 0.5
 
 
 def test_predict_rejects_missing_feature_columns(dfSample, dctConfig):
     """Predicting on data without the configured feature columns raises a clear error."""
-    dfX, serY = tplBuildFeatures(dfSample, dctConfig)
+    dfX, serY = dfRawInputs(dfSample, dctConfig), tplBuildFeatures(dfSample, dctConfig)[1]
     mdlModel = mdlTrainModel(dfX, serY, dctConfig)
     with pytest.raises(ValueError, match="feature_b"):
         dfPredict(mdlModel, dfSample.drop(columns=["feature_b"]), dctConfig)
@@ -55,7 +55,7 @@ def test_model_round_trip(dfSample, dctConfig, tmp_path):
     tmp_path is a pytest fixture that supplies a throwaway folder, so the test
     never writes into the real artifacts/ folder.
     """
-    dfX, serY = tplBuildFeatures(dfSample, dctConfig)
+    dfX, serY = dfRawInputs(dfSample, dctConfig), tplBuildFeatures(dfSample, dctConfig)[1]
     mdlModel = mdlTrainModel(dfX, serY, dctConfig)
     pthFile = pthSaveModel(mdlModel, tmp_path / "model.joblib")
     mdlLoaded = mdlLoadModel(pthFile)
@@ -114,8 +114,8 @@ def test_positive_label_setting_changes_recall(dctConfig):
 def test_class_weight_setting_reaches_the_model(dfSample, dctConfig):
     """model.class_weight in the config is the one the model is built with."""
     dctConfig["model"]["class_weight"] = "balanced"
-    dfX, serY = tplBuildFeatures(dfSample, dctConfig)
-    assert mdlTrainModel(dfX, serY, dctConfig).class_weight == "balanced"
+    dfX, serY = dfRawInputs(dfSample, dctConfig), tplBuildFeatures(dfSample, dctConfig)[1]
+    assert mdlTrainModel(dfX, serY, dctConfig).named_steps["model"].class_weight == "balanced"
 
 
 def test_balanced_weights_make_the_model_flag_the_rare_class(dctConfig):
@@ -126,7 +126,7 @@ def test_balanced_weights_make_the_model_flag_the_rare_class(dctConfig):
         "feature_b": [0.0] * 100,
         "target": [0] * 90 + [0] * 3 + [1] * 2 + [1] * 5,
     })
-    dfX, serY = tplBuildFeatures(dfData, dctConfig)
+    dfX, serY = dfRawInputs(dfData, dctConfig), tplBuildFeatures(dfData, dctConfig)[1]
 
     dctConfig["model"]["class_weight"] = None
     intPlain = int(mdlTrainModel(dfX, serY, dctConfig).predict(dfX).sum())
@@ -147,11 +147,64 @@ def test_prediction_uses_the_same_engineered_columns_as_training(dctConfig):
         "sex": ["Female", "Male"] * 6,
         "target": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
     })
-    dfX, serY = tplBuildFeatures(dfData, dctConfig)
+    dfX, serY = dfRawInputs(dfData, dctConfig), tplBuildFeatures(dfData, dctConfig)[1]
     mdlModel = mdlTrainModel(dfX, serY, dctConfig)
     dfOut = dfPredict(mdlModel, dfData[["sys", "dia", "sex"]], dctConfig)
     assert len(dfOut) == len(dfData)
     assert "prediction" in dfOut.columns
+
+
+def test_saved_file_is_one_pipeline_with_a_feature_step_and_a_model(dfSample, dctConfig):
+    """The saved object has two named steps, so one file prepares the columns and scores them."""
+    dfX, serY = dfRawInputs(dfSample, dctConfig), tplBuildFeatures(dfSample, dctConfig)[1]
+    mdlModel = mdlTrainModel(dfX, serY, dctConfig)
+    assert list(mdlModel.named_steps) == ["features", "model"]
+
+
+def test_pipeline_gives_the_same_answers_as_the_separate_steps(dctConfig):
+    """Scoring raw rows through the pipeline matches engineering the columns then scoring them."""
+    dctConfig["features"]["feature_columns"] = ["sys", "dia", "sex"]
+    dctConfig["features"]["difference_columns"] = {"pulse_pressure": ["sys", "dia"]}
+    dctConfig["features"]["categorical_columns"] = {"sex": ["Female", "Male"]}
+    dfData = pd.DataFrame({
+        "sys": [110, 120, 130, 140, 150, 160, 115, 125, 135, 145, 155, 165],
+        "dia": [70, 75, 80, 85, 90, 95, 72, 78, 82, 88, 92, 98],
+        "sex": ["Female", "Male"] * 6,
+        "target": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    })
+    dfRaw = dfRawInputs(dfData, dctConfig)
+    dfX, serY = tplBuildFeatures(dfData, dctConfig)
+    mdlModel = mdlTrainModel(dfRaw, serY, dctConfig)
+    assert list(mdlModel.named_steps["model"].feature_names_in_) == list(dfX.columns)
+    assert list(mdlModel.predict(dfRaw)) == list(mdlModel.named_steps["model"].predict(dfX))
+
+
+def test_pipeline_survives_saving_and_loading_with_engineered_columns(dctConfig, tmp_path):
+    """A pipeline saved to disk and loaded back still builds the columns and scores raw rows."""
+    dctConfig["features"]["feature_columns"] = ["sys", "dia", "sex"]
+    dctConfig["features"]["difference_columns"] = {"pulse_pressure": ["sys", "dia"]}
+    dctConfig["features"]["categorical_columns"] = {"sex": ["Female", "Male"]}
+    dfData = pd.DataFrame({
+        "sys": [110, 120, 130, 140, 150, 160, 115, 125, 135, 145, 155, 165],
+        "dia": [70, 75, 80, 85, 90, 95, 72, 78, 82, 88, 92, 98],
+        "sex": ["Female", "Male"] * 6,
+        "target": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    })
+    dfRaw = dfRawInputs(dfData, dctConfig)
+    mdlModel = mdlTrainModel(dfRaw, dfData["target"], dctConfig)
+    mdlLoaded = mdlLoadModel(pthSaveModel(mdlModel, tmp_path / "model.joblib"))
+    assert list(mdlLoaded.predict(dfRaw)) == list(mdlModel.predict(dfRaw))
+
+
+def test_pipeline_refuses_an_unknown_category(dctConfig):
+    """A sex value that is not on the config list stops the pipeline instead of scoring as the first category."""
+    dctConfig["features"]["feature_columns"] = ["sys", "sex"]
+    dctConfig["features"]["difference_columns"] = {}
+    dctConfig["features"]["categorical_columns"] = {"sex": ["Female", "Male"]}
+    dfData = pd.DataFrame({"sys": [110, 120, 130, 140, 150, 160], "sex": ["Female", "Male"] * 3, "target": [0, 1, 0, 1, 0, 1]})
+    mdlModel = mdlTrainModel(dfRawInputs(dfData, dctConfig), dfData["target"], dctConfig)
+    with pytest.raises(ValueError, match="not in the allowed list"):
+        mdlModel.predict(pd.DataFrame({"sys": [120], "sex": ["Other"]}))
 
 
 def test_unknown_model_type_raises(dctConfig):
@@ -202,7 +255,7 @@ def test_saved_features_show_the_encoded_columns_and_the_split(dfSample, dctConf
     """The inspection file holds the inputs, the target and a train or test label for every row."""
     from src.features import lstSplitData
     from src.train import pthSaveFeatures
-    dfX, serY = tplBuildFeatures(dfSample, dctConfig)
+    dfX, serY = dfRawInputs(dfSample, dctConfig), tplBuildFeatures(dfSample, dctConfig)[1]
     dfXTrain, dfXTest, serYTrain, serYTest = lstSplitData(dfX, serY, dctConfig)
     pthFile = pthSaveFeatures(dfXTrain, dfXTest, serYTrain, serYTest, tmp_path / "f.csv")
     dfSaved = pd.read_csv(pthFile)

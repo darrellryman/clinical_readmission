@@ -47,7 +47,7 @@ from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 # Records the run (scores, files, tags) in MLflow when tracking is on.
 from src.tracking import bLogRun, strFileFingerprint
-from src.features import tplBuildFeatures, lstSplitData
+from src.features import tplBuildFeatures, lstSplitData, dfRawInputs
 from src.ingest import dfLoadCsv
 from src.train import mdlLoadModel
 from src.validate import dfValidate
@@ -232,8 +232,10 @@ def subMain() -> None:
         mdlModel = mdlLoadModel(strModelPath)
         # Find which probability column belongs to the positive value (for AUC).
         intPositive = list(mdlModel.classes_).index(dctConfig["evaluation"]["positive_label"])
-        arrProbabilities = mdlModel.predict_proba(dfXTest)[:, intPositive]
-        dctMetrics = dctComputeMetrics(serYTest, mdlModel.predict(dfXTest), dctConfig, arrProbabilities)
+        # The saved pipeline builds the engineered columns itself, so it is given the raw test rows.
+        dfRawTest = dfRawInputs(dfData, dctConfig).loc[dfXTest.index]
+        arrProbabilities = mdlModel.predict_proba(dfRawTest)[:, intPositive]
+        dctMetrics = dctComputeMetrics(serYTest, mdlModel.predict(dfRawTest), dctConfig, arrProbabilities)
 
         # Write the metrics to disk, creating the folder if needed.
         pthOut = Path(strOutputPath)
@@ -253,7 +255,7 @@ def subMain() -> None:
         )
 
         # Count each kind of error, so the cost of a miss or a false alarm can be discussed.
-        arrPredictions = mdlModel.predict(dfXTest)
+        arrPredictions = mdlModel.predict(dfRawTest)
         print("\nERROR COUNTS ON THE TEST ROWS")
         print(dfConfusionCounts(serYTest, arrPredictions, dctConfig).to_string(index=False))
 

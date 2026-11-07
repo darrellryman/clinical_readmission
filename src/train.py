@@ -38,8 +38,9 @@
 import argparse
 import datetime
 import json
-import subprocess  
-from pathlib import Path
+import subprocess
+import platform
+import yaml
 
 # joblib saves and loads Python objects (like a fitted model) to and from disk.
 # It is the standard choice for scikit-learn models.
@@ -48,6 +49,10 @@ import joblib
 # pandas joins the training and test tables into one file.
 import numpy as np
 import pandas as pd
+import importlib.metadata as objMeta
+
+# The class for working with file and folder paths
+from pathlib import Path
 
 # The three kinds of model the pipeline can build: a do-nothing baseline, a
 # logistic regression (simple and fast) and a random forest (many decision trees).
@@ -56,6 +61,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.pipeline import Pipeline
 
 from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
@@ -63,7 +69,7 @@ from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep, 
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 # Records the run (settings, files, tags) in MLflow when tracking is on.
 from src.tracking import bLogRun, strFileFingerprint, strGitCommit
-from src.features import tplBuildFeatures, lstSplitData
+from src.features import tplBuildFeatures, lstSplitData, objBuildFeatureStep, dfRawInputs, dfEngineerFeatures
 from src.ingest import dfLoadCsv
 from src.validate import dfValidate
 
@@ -185,20 +191,24 @@ def mdlBuildModel(dctSettings: dict, intSeed: int):
     raise ValueError(f"Unknown model type '{strType}'. Use dummy, logistic, random_forest or rule.")
 
 
-def mdlTrainModel(dfXTrain, serYTrain, dctConfig: dict):
-    """Fit a model on the training data and return it.
+def mdlTrainModel(dfRawTrain, serYTrain, dctConfig: dict):
+    """Fit the feature step and the model together on the training rows, and return the pipeline.
+
+    The returned pipeline has two steps, "features" and "model". Given raw patient
+    columns, it builds the calculated and encoded columns and then scores them, so
+    one saved file does both jobs.
 
     Keeping this as its own small function means tests can train a model on
     tiny data without touching the disk.
 
     Args:
-        dfXTrain: Training inputs.
+        dfRawTrain: Raw training inputs (the feature_columns, before any engineering).
         serYTrain: Training targets.
         dctConfig: The loaded config.yaml settings. Uses model.max_iter, model.C,
             model.class_weight and project.random_state.
 
     Returns:
-        The fitted model.
+        The fitted pipeline.
     """
     dctModelSettings = dctConfig["model"]
 
@@ -206,9 +216,10 @@ def mdlTrainModel(dfXTrain, serYTrain, dctConfig: dict):
     # max_iter caps the solver's steps. C sets the regularisation strength.
     # class_weight "balanced" gives the rarer target value more weight (None means
     # equal weight). random_state keeps results repeatable.
-    mdlModel = mdlBuildModel({"type": "logistic", **dctModelSettings}, dctConfig["project"]["random_state"])
-    mdlModel.fit(dfXTrain, serYTrain)
-    return mdlModel
+    mdlLogistic = mdlBuildModel({"type": "logistic", **dctModelSettings}, dctConfig["project"]["random_state"])
+    mdlPipeline = Pipeline([("features", objBuildFeatureStep(dctConfig)), ("model", mdlLogistic)])
+    mdlPipeline.fit(dfRawTrain, serYTrain)
+    return mdlPipeline
 
 
 def arrCrossValScores(mdlModel, dfXTrain, serYTrain, intFolds: int, intSeed: int):
@@ -304,7 +315,7 @@ def dctBuildModelCard(dctConfig: dict, dctGate: dict, dfXTrain, serYTrain, strDa
         dctConfig: The loaded config.yaml settings. Uses model, features,
             approval and project.
         dctGate: The result from dctCheckModelGate.
-        dfXTrain: Training inputs, for the column names and row count.
+        dfXTrain: Engineered training inputs, for the model column names and row count.
         serYTrain: Training targets, for the readmission rate.
         strDataPath: The processed CSV the model was trained from.
         strModelPath: The saved model file, for its fingerprint.
@@ -318,7 +329,8 @@ def dctBuildModelCard(dctConfig: dict, dctGate: dict, dfXTrain, serYTrain, strDa
         "created_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "parameters": {strKey: varValue for strKey, varValue in dctConfig["model"].items() if strKey != "path"},
         "target": dctConfig["features"]["target_column"],
-        "input_columns": list(dfXTrain.columns),
+        "input_columns": list(dctConfig["features"]["feature_columns"]),
+        "model_columns": list(dfXTrain.columns),
         "training_rows": int(len(dfXTrain)),
         "training_positive_rate": round(float(serYTrain.mean()), 4),
         "random_state": dctConfig["project"]["random_state"],
@@ -404,6 +416,187 @@ def mdlLoadModel(varPath):
         raise FileNotFoundError(f"No model at {pthFile}. Run src.train first.")
     return joblib.load(pthFile)
 
+def subPrintVersionEvidence() -> None:
+    """Print the Git, config fingerprint, pythin version and DVC details.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        None.
+
+    Returns:
+        None. It only prints.
+    """
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Tracking evidence{STR_RESET}")
+    print(f"{STR_BOLD}Git commit:{STR_RESET} {strGitCommit()}")
+    print(f"{STR_BOLD}config.yaml fingerprint:{STR_RESET} {strFileFingerprint('config.yaml')}")
+    print(f"{STR_BOLD}Python:{STR_RESET} {platform.python_version()}")
+
+    print(f"\n{STR_BOLD}Library versions installed:{STR_RESET}")
+    for strPackage in ["pandas", "scikit-learn", "joblib", "pyyaml", "mlflow-skinny", "dvc"]:
+        try:
+            strVersion = objMeta.version(strPackage)
+        except objMeta.PackageNotFoundError:
+            strVersion = "not installed"
+        print(f"  {strPackage}: {strVersion}")
+
+    print(f"\n{STR_BOLD}DVC lock file (dvc.lock):{STR_RESET}")
+    try:
+        with open("dvc.lock", encoding="utf-8") as objHandle:
+            dctLock = yaml.safe_load(objHandle)
+        for strStage, dctStage in dctLock["stages"].items():
+            print(
+                f"  {strStage}: {len(dctStage.get('deps', []))} inputs, {len(dctStage.get('outs', []))} outputs recorded")
+        for dctOut in dctLock["stages"]["train"]["outs"]:
+            print(f"  train output {dctOut['path']}: md5 {dctOut['md5'][:8]}")
+    except (OSError, KeyError, TypeError):
+        print("  No dvc.lock yet. Run dvc repro.")
+
+def tplTrainAndSaveModel(dctConfig: dict, dfRawTrain: pd.DataFrame, serYTrain: pd.Series,
+                         strInputPath: str, strModelPath: str) -> tuple:
+    """Fit the model, check it against the approval gate, save it and record the run.
+
+    It prints the gate result and where the model and card were saved, so the text
+    goes to the stage's RTF file with everything else.
+
+    Args:
+        dctConfig: The loaded config.yaml settings.
+        dfRawTrain: The raw training inputs (feature_columns only, before engineering).
+        serYTrain: The training targets from lstSplitData.
+        strInputPath: The processed CSV the model is trained from.
+        strModelPath: Where to save the model.
+
+    Returns:
+        A tuple of the model file path and the model card path.
+
+    Raises:
+        ModelGateError: If the model fails the approval gate. It is not saved.
+    """
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Model Training{STR_RESET}")
+
+    # Fit the model and save it for the later stages.
+    mdlModel = mdlTrainModel(dfRawTrain, serYTrain, dctConfig)
+
+    # The gate and the card work on the engineered columns, built the same way the pipeline builds them.
+    dfXTrain = dfEngineerFeatures(dfRawTrain, dctConfig)
+
+    # The approval gate. The model is saved only if it beats the baseline by
+    # the margin set in approval.min_auc_gain. Training rows only.
+    dctGate = dctCheckModelGate(dfXTrain, serYTrain, dctConfig)
+    if dctGate["enabled"]:
+        print(f"\nApproval gate: baseline cross-validated AUC {dctGate['baseline_cv_auc']:.3f}, "
+              f"model {dctGate['model_cv_auc']:.3f}, gain {dctGate['auc_gain']:.3f}, "
+              f"required {dctGate['required_gain']:.3f}. {'PASSED' if dctGate['passed'] else 'FAILED'}.")
+    else:
+        print("\nApproval gate is switched off in config.yaml.")
+    if not dctGate["passed"]:
+        # Stop here. The model is not saved, so evaluate.py and predict.py
+        # can't pick up a model that failed.
+        raise ModelGateError(
+            f"\nThe model gained {dctGate['auc_gain']:.3f} AUC over the baseline, "
+            f"below the required {dctGate['required_gain']:.3f}. The model was not saved."
+        )
+
+    pthOut = pthSaveModel(mdlModel, strModelPath)
+    print(f"\nTrained on {len(dfXTrain)} rows. Model saved to {pthOut}")
+
+    # Save the model card beside the model: what it is for, what built it, and the gate result.
+    pthCard = pthSaveModelCard(
+        dctBuildModelCard(dctConfig, dctGate, dfXTrain, serYTrain, strInputPath, pthOut),
+        dctConfig["approval"]["model_card_path"],
+    )
+    print(f"\nModel card saved to {pthCard}\n")
+
+    # Record this training run. The model's fingerprint lets evaluate.py and
+    # compare.py point back to exactly this model file.
+    dctFeatures = dctConfig["features"]
+    bLogRun(
+        dctConfig, "train", "logistic_regression",
+        dctParams={
+            **{f"model.{strKey}": varValue for strKey, varValue in dctConfig["model"].items() if strKey != "path"},
+            "features.feature_columns": dctFeatures["feature_columns"],
+            "features.categorical_columns": dctFeatures["categorical_columns"],
+            "features.difference_columns": dctFeatures["difference_columns"],
+            "features.test_size": dctFeatures["test_size"],
+            "features.stratify": dctFeatures["stratify"],
+            "project.random_state": dctConfig["project"]["random_state"],
+        },
+        dctMetrics={"training_rows": len(dfXTrain)},
+        lstArtifacts=[pthOut, pthCard],
+        dctTags={"model_fingerprint": strFileFingerprint(pthOut), "gate_passed": str(dctGate["passed"])},
+    )
+    return pthOut, pthCard
+
+
+def subPrintModelProvenanceEvidence(pthCard: Path, pthOut: Path, strInputPath: str) -> None:
+    """Print where the model came from, read back from its model card.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        pthCard: The saved model card.
+        pthOut: The saved model file.
+        strInputPath: The processed CSV the model was trained from.
+
+    Returns:
+        None. It only prints.
+    """
+
+    dctSaved = json.loads(Path(pthCard).read_text(encoding="utf-8"))
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Model provenance (from the model card){STR_RESET}")
+    print(f"{STR_BOLD}Created (UTC):{STR_RESET} {dctSaved['created_utc']}")
+    print(f"{STR_BOLD}Git commit:{STR_RESET} {dctSaved['git_commit']}")
+    print(f"{STR_BOLD}Random seed:{STR_RESET} {dctSaved['random_state']}")
+    print(f"{STR_BOLD}Gate result:{STR_RESET} {'PASSED' if dctSaved['gate']['passed'] else 'FAILED'}")
+    print(f"{STR_BOLD}Status:{STR_RESET} {dctSaved['status']}")
+
+    print(f"\n{STR_BOLD}Fingerprint check (card against the files on disk){STR_RESET}")
+    for strLabel, strKey, varFile in [
+        ("Model", "model_fingerprint", pthOut),
+        ("Data", "data_fingerprint", strInputPath),
+        ("Config", "config_fingerprint", "config.yaml"),
+    ]:
+        strNow = strFileFingerprint(varFile)
+        strResult = "MATCH" if strNow == dctSaved[strKey] else "DIFFERENT"
+        print(f"  {strLabel}: card {dctSaved[strKey]}, file {strNow}, {strResult}")
+
+def subPrintDataSplitEvidence(dctConfig: dict, dfXTrain: pd.DataFrame, dfXTest: pd.DataFrame) -> None:
+    """Print the data split evidence.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        dctConfig: The loaded config.yaml settings.
+
+    Returns:
+        None. It only prints.
+
+    """
+    # Split percentages: the settings from config.yaml, then the actual rows.
+    fltNew = dctConfig['data']['new_data_fraction']
+    fltTest = dctConfig['features']['test_size']
+    intTrain, intTest = len(dfXTrain), len(dfXTest)
+    intUsed = intTrain + intTest
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Data split{STR_RESET}")
+    print(
+        f"{STR_BOLD}Set aside as new patients (data.new_data_fraction):{STR_RESET} {fltNew:.0%} of the cleaned rows")
+    print(f"{STR_BOLD}Test share (features.test_size):{STR_RESET} {fltTest:.0%} of the remaining rows")
+    print(f"{STR_BOLD}Stratified on the target (features.stratify):{STR_RESET} {dctConfig['features']['stratify']}")
+    print(f"{STR_BOLD}Training rows:{STR_RESET} {intTrain} ({intTrain / intUsed:.1%} of the {intUsed} rows used)")
+    print(f"{STR_BOLD}Test rows:{STR_RESET} {intTest} ({intTest / intUsed:.1%} of the {intUsed} rows used)")
+    print(f"{STR_BOLD}Overall, as a share of the cleaned data:{STR_RESET} "
+          f"train {(1 - fltNew) * (1 - fltTest):.1%}, test {(1 - fltNew) * fltTest:.1%}, new patients {fltNew:.1%}")
+
 
 def subMain() -> None:
     """Command line entry point: run the full training stage."""
@@ -445,6 +638,7 @@ def subMain() -> None:
         # Prints this step, in bold italic, into the RTF file. Write your answer between
         # the quotes on the second line. Use triple quotes if it runs over several lines.
         print(f"\n{STR_BOLD}Target Variable:{STR_RESET} {dctConfig['features']['target_column']}")
+
         subPrintStep(
             "Step 1 - Identify the target variable, whether the task is classification or regression, and the unit for which each prediction is made.",
             "The target is readmission_30d. If the value is 1, the patient was readmitted within 30 days of discharge and 0 if not. This is a binary classification, not a regression. Each prediction is made for one adult inpatient at the point of discharge. The model gives a probability of readmission for that patient, and a flag is raised when it is high enough.",
@@ -480,21 +674,7 @@ def subMain() -> None:
             "Ingest, validate, and feature preprocessing are each split into a single named script: ingest.py, validate.py and features.py. Each script can be run with a single command such as python -m src.ingest. The steps are chained together in dvc.yaml so that dvc repro will run them in the correct order after any changes. All configuration settings are in config.yaml. Each step is run in exactly the same way every time.",
         )
 
-        # Split percentages: the settings from config.yaml, then the actual rows.
-        fltNew = dctConfig['data']['new_data_fraction']
-        fltTest = dctConfig['features']['test_size']
-        intTrain, intTest = len(dfXTrain), len(dfXTest)
-        intUsed = intTrain + intTest
-
-        print(f"\n{STR_BOLD}{STR_UNDERLINE}Data split{STR_RESET}")
-        print(
-            f"{STR_BOLD}Set aside as new patients (data.new_data_fraction):{STR_RESET} {fltNew:.0%} of the cleaned rows")
-        print(f"{STR_BOLD}Test share (features.test_size):{STR_RESET} {fltTest:.0%} of the remaining rows")
-        print(f"{STR_BOLD}Stratified on the target (features.stratify):{STR_RESET} {dctConfig['features']['stratify']}")
-        print(f"{STR_BOLD}Training rows:{STR_RESET} {intTrain} ({intTrain / intUsed:.1%} of the {intUsed} rows used)")
-        print(f"{STR_BOLD}Test rows:{STR_RESET} {intTest} ({intTest / intUsed:.1%} of the {intUsed} rows used)")
-        print(f"{STR_BOLD}Overall, as a share of the cleaned data:{STR_RESET} "
-              f"train {(1 - fltNew) * (1 - fltTest):.1%}, test {(1 - fltNew) * fltTest:.1%}, new patients {fltNew:.1%}")
+        subPrintDataSplitEvidence(dctConfig, dfXTrain, dfXTest)
 
         # The split happened above before any model was fitted. Say which transformations are fitted and which are fixed rules.
         subPrintStep(
@@ -514,56 +694,8 @@ def subMain() -> None:
             "The input file contains 10 single-time-point clinical measures. This dataset omits many well-known readmission risk predictors, such as the number of previous admissions, length of stay, medications, and support at home. Diabetes and hypertension are included as simple binary flags, but no indication of severity or degree of control of either of these conditions is provided. The two engineered features, pulse_pressure and sex_Male, are basic. Sex is restricted to male or female. There are no ethnicity, Indigenous status or location columns, so the model can’t be checked for whether it treats different groups differently. The data is synthetic, so the model can only learn the relationships embedded in the data generator.",
         )
 
-        print(f"\n{STR_BOLD}{STR_UNDERLINE}Model Training{STR_RESET}")
-
-        # Fit the model and save it for the later stages.
-        mdlModel = mdlTrainModel(dfXTrain, serYTrain, dctConfig)
-
-        # The approval gate. The model is saved only if it beats the baseline by
-        # the margin set in approval.min_auc_gain. Training rows only.
-        dctGate = dctCheckModelGate(dfXTrain, serYTrain, dctConfig)
-        if dctGate["enabled"]:
-            print(f"\nApproval gate: baseline cross-validated AUC {dctGate['baseline_cv_auc']:.3f}, "
-                  f"model {dctGate['model_cv_auc']:.3f}, gain {dctGate['auc_gain']:.3f}, "
-                  f"required {dctGate['required_gain']:.3f}. {'PASSED' if dctGate['passed'] else 'FAILED'}.")
-        else:
-            print("\nApproval gate is switched off in config.yaml.")
-        if not dctGate["passed"]:
-            # Stop here. The model is not saved, so evaluate.py and predict.py
-            # can't pick up a model that failed.
-            raise ModelGateError(
-                f"\nThe model gained {dctGate['auc_gain']:.3f} AUC over the baseline, "
-                f"below the required {dctGate['required_gain']:.3f}. The model was not saved."
-            )
-
-        pthOut = pthSaveModel(mdlModel, strModelPath)
-        print(f"\nTrained on {len(dfXTrain)} rows. Model saved to {pthOut}")
-
-        # Save the model card beside the model: what it is for, what built it, and the gate result.
-        pthCard = pthSaveModelCard(
-            dctBuildModelCard(dctConfig, dctGate, dfXTrain, serYTrain, strInputPath, pthOut),
-            dctConfig["approval"]["model_card_path"],
-        )
-        print(f"\nModel card saved to {pthCard}\n")
-
-        # Record this training run. The model's fingerprint lets evaluate.py and
-        # compare.py point back to exactly this model file.
-        dctFeatures = dctConfig["features"]
-        bLogRun(
-            dctConfig, "train", "logistic_regression",
-            dctParams={
-                **{f"model.{strKey}": varValue for strKey, varValue in dctConfig["model"].items() if strKey != "path"},
-                "features.feature_columns": dctFeatures["feature_columns"],
-                "features.categorical_columns": dctFeatures["categorical_columns"],
-                "features.difference_columns": dctFeatures["difference_columns"],
-                "features.test_size": dctFeatures["test_size"],
-                "features.stratify": dctFeatures["stratify"],
-                "project.random_state": dctConfig["project"]["random_state"],
-            },
-            dctMetrics={"training_rows": len(dfXTrain)},
-            lstArtifacts=[pthOut, pthCard],
-            dctTags={"model_fingerprint": strFileFingerprint(pthOut), "gate_passed": str(dctGate["passed"])},
-        )
+        pthOut, pthCard = tplTrainAndSaveModel(
+            dctConfig, dfRawInputs(dfData, dctConfig).loc[dfXTrain.index], serYTrain, strInputPath, strModelPath)
 
         # The training line above is the evidence for model training.
         subPrintStep(
@@ -585,27 +717,36 @@ def subMain() -> None:
         )
 
         print(f"\n{STR_BOLD}{STR_UNDERLINE}Git history{STR_RESET}")
-        objLog = subprocess.run(["git", "log", "--oneline", "--date=short", "--format=%h  %ad  %s"],
-                                capture_output=True, text=True)
-        print(objLog.stdout.strip() if objLog.returncode == 0 and objLog.stdout.strip()
-              else "No Git history found. Run git init and make commits first.")
+        try:
+            objLog = subprocess.run(["git", "log", "--date=short", "--format=%h  %ad  %s"],
+                                    capture_output=True, text=True, encoding="utf-8", timeout=10)
+            strLog = objLog.stdout.strip() if objLog.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            strLog = ""
+
+        print(strLog or "No Git history found. Git isn't installed, or this folder isn't a Git repository.")
 
         # No code produces this evidence. It lives in the Git history, so describe your commits here.
         subPrintStep(
             "Step 4 - Use Git throughout the project and make meaningful commits that reflect the development of the pipeline.",
-            "",
+            "Git was used to commit the pipeline in the order it runs, and the history is pushed to a private GitHub repository. Five commits build out the stages of the pipeline in sequence, ending with the tests and CI workflow. Four more initialise DVC, track the raw data with a pointer file, and record the first run by committing dvc.lock. The commit message for each one sums up what was added.",
         )
+
+        # print the tracking evidence
+        subPrintVersionEvidence()
 
         # config.yaml, requirements.txt and dvc.yaml are the evidence. Say what each one pins.
         subPrintStep(
             "Step 4 - Track the code, configuration and environment needed to reproduce the project.",
-            "",
+            "All the code is tracked in Git. The stage scripts are in src/, and the tests are in tests/. All the configuration is stored in a file config.yaml. This file contains all code settings, including the random seed for random number generation. The dvc.yaml file details all the stages. For each stage, it lists all inputs and outputs. The hashed values of the inputs and outputs for a given run are stored in dvc.lock. The environment is defined in requirements.txt. In the GitHub Actions workflow, the Python version is set to 3.12. Most libraries in requirements.txt only have a minimum version, so a later install could pick up newer releases and give slightly different results.",
         )
+
+        subPrintModelProvenanceEvidence(pthCard, pthOut, strInputPath)
 
         # The model file above came from the data, code and config at this commit. Explain how to trace it (dvc.lock, Git commit).
         subPrintStep(
             "Step 4 - Explain how another team member could identify which data, code, configuration and evidence produced the selected model.",
-            "",
+            "The model card saved beside the model records the Git commit, the random seed, and fingerprints of the model, the data and config.yaml. The commit provides the same code and config from Git, and dvc.lock, with the raw data’s pointer file, lets DVC restore the matching data. The same commit and fingerprints are tagged on the MLflow run, which also holds the parameters and scores. As long as the restored files match the fingerprints on the card, the team member will have the same model, data and configuration.",
         )
 
         # The model file saved above is reused by evaluate.py and predict.py. Say what it contains and what it does not.

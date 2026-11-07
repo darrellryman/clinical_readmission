@@ -49,7 +49,7 @@ from src.config import subAddConfigArgument, dctLoadConfig
 from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.evaluate import dfBuildGroups, dfConfusionCounts, dfMetricsByGroup
-from src.features import tplBuildFeatures, lstSplitData
+from src.features import tplBuildFeatures, lstSplitData, dfRawInputs
 from src.ingest import dfLoadCsv
 from src.train import arrCrossValScores, mdlBuildModel, mdlLoadModel
 from src.validate import dfValidate
@@ -300,9 +300,11 @@ def lstDrawAllFigures(dfData: pd.DataFrame, mdlSaved, dctConfig: dict) -> list:
         dctProbabilities[strName] = mdlModel.predict_proba(dfXTest)[:, intPositive]
 
     # The saved model drives the error counts and the group graph, as in evaluate.py.
-    arrPredictions = mdlSaved.predict(dfXTest)
+    # The saved pipeline builds its own engineered columns, so it is given the raw test rows.
+    dfRawTest = dfRawInputs(dfData, dctConfig).loc[dfXTest.index]
+    arrPredictions = mdlSaved.predict(dfRawTest)
     intSaved = list(mdlSaved.classes_).index(varPositive)
-    arrSavedProb = mdlSaved.predict_proba(dfXTest)[:, intSaved]
+    arrSavedProb = mdlSaved.predict_proba(dfRawTest)[:, intSaved]
 
     lstPaths = [
         pthSaveFigure(objPlotRocAndPr(dctProbabilities, serYTest, dctConfig), dctPlots["folder"], STR_ROC_FILE, dctPlots["dpi"]),

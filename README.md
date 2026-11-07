@@ -27,7 +27,7 @@ Each stage is its own program. They pass results to each other through files.
 | Train | `python -m src.train` | Builds features, splits train and test, saves the encoded features for inspection, fits logistic regression, checks it against the approval gate, then saves the model and a model card |
 | Evaluate | `python -m src.evaluate` | Scores the model on the test rows, writes the metrics file, and prints the error counts and the scores by sex and age band |
 | Compare | `python -m src.compare` | Trains a baseline, a simple age rule and two candidate models on the same rows, writes one comparison table, and writes an evaluation evidence record |
-| Predict | `python -m src.predict` | Scores the new patients with the saved model, and checks the predictions against their kept-apart answers |
+| Predict | `python -m src.predict` | Scores the new patients with the saved pipeline, and checks the predictions against their kept-apart answers |
 | Plots | `python -m src.plots` | Optional. Draws four evidence graphs into `reports/figures/`: ROC and precision-recall curves, cross-validated AUC per fold, the error-count grid, and recall and precision by group. See [Graphs](#graphs) |
 | Serve | `python -m src.app` | Optional. Serves the saved model as a web API (FastAPI). See [Prediction service](#prediction-service) |
 
@@ -168,7 +168,7 @@ There are 10 inputs: age, sex, BMI, systolic and diastolic blood pressure, gluco
 
 `train.py` also writes the encoded features to `data/processed/features.csv` (`outputs.features_path`), with the target and a `split` column that says train or test, so you can open it and see exactly what the model saw. It is for inspection only. No stage reads it back, because every stage builds features with the same function, and reading a saved copy could let training and prediction drift apart.
 
-One function, `dfEngineerFeatures` in `src/features.py`, builds these columns. Training and `predict.py` both call it, so the two can't drift apart. The sex categories come from the config, and a value that isn't on the list stops the run with an error.
+One function, `dfEngineerFeatures` in `src/features.py`, builds these columns. It is the first step of the saved pipeline (see `objBuildFeatureStep`), so the model file carries its own feature step and training, `evaluate`, `predict.py` and the web service can't drift apart. You give the saved model raw patient columns and it builds the rest. The sex categories come from the config, and a value that isn't on the list stops the run with an error.
 
 ## Results
 
@@ -226,7 +226,7 @@ Then open `http://127.0.0.1:8000/` for a form where you enter one patient's pred
 | `GET /info` | Returns the model card |
 | `POST /predict` | Scores the patients in `{"patients": [{...}]}` and returns a class and a probability for each |
 
-The request format is built from the config, so it always matches the model's inputs. A missing field, an extra field, a wrong type or a sex value that isn't on the list is refused with a 422 error before it reaches the model. Accepted patients go through `dfEngineerFeatures`, the same function training uses. The service stops at start-up if there is no saved model.
+The request format is built from the config, so it always matches the model's inputs. A missing field, an extra field, a wrong type or a sex value that isn't on the list is refused with a 422 error before it reaches the model. Accepted patients go to the saved pipeline, which builds the engineered columns itself, as it did in training. The service stops at start-up if there is no saved model.
 
 It is a demonstration. The model is trained on synthetic data and must not be used for real patients. The tests in `tests/test_app.py` need the service libraries and are skipped if they aren't installed.
 
@@ -244,7 +244,7 @@ By default, what each stage prints goes to an RTF file instead of the screen, fo
 python -m pytest tests
 ```
 
-165 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
+183 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
 
 ## Track runs with MLflow
 

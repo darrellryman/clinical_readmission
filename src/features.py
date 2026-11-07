@@ -20,13 +20,18 @@
     training rows and which are test rows.
     
     It also holds dfEngineerFeatures(), which builds the calculated and encoded
-    columns. Training, evaluation and prediction all call that one function, so
-    the model always sees columns made the same way (no train-serve mismatch).
+    columns, and objBuildFeatureStep(), which wraps that function as the first
+    step of the saved pipeline. The saved model file therefore carries its own
+    feature step, so training, evaluation, prediction and the web service all
+    prepare the columns the same way (no train-serve mismatch).
 
     The column names, test size and random seed all come from config.yaml.
 """
 
 import pandas as pd
+
+# FunctionTransformer wraps a plain function as a pipeline step.
+from sklearn.preprocessing import FunctionTransformer
 
 # train_test_split shuffles the rows and divides them into two groups.
 from sklearn.model_selection import train_test_split
@@ -83,6 +88,40 @@ def dfEngineerFeatures(dfX: pd.DataFrame, dctConfig: dict) -> pd.DataFrame:
         dfOut = dfOut.drop(columns=[strColumn])
 
     return dfOut
+
+
+def objBuildFeatureStep(dctConfig: dict) -> FunctionTransformer:
+    """Wrap dfEngineerFeatures as a pipeline step, so it is saved inside the model file.
+
+    The step learns nothing from the data. It only applies the fixed rules in the
+    config, so fitting it on training rows and applying it to new rows give the
+    same result as calling dfEngineerFeatures directly.
+
+    Args:
+        dctConfig: The loaded config.yaml settings.
+
+    Returns:
+        A scikit-learn step that turns the raw feature columns into model columns.
+    """
+    # validate=False keeps the DataFrame as it is, so column names reach the model.
+    # feature_names_out="one-to-one" is not used because the columns change.
+    return FunctionTransformer(dfEngineerFeatures, kw_args={"dctConfig": dctConfig}, validate=False)
+
+
+def dfRawInputs(dfData: pd.DataFrame, dctConfig: dict) -> pd.DataFrame:
+    """Return only the raw feature columns, in the config's order, with no changes.
+
+    These are the columns the saved pipeline expects. The pipeline builds the
+    calculated and encoded columns itself.
+
+    Args:
+        dfData: A validated DataFrame, or new patients.
+        dctConfig: The loaded config.yaml settings.
+
+    Returns:
+        A new DataFrame holding features.feature_columns.
+    """
+    return dfData[dctConfig["features"]["feature_columns"]].copy()
 
 
 def tplBuildFeatures(dfData: pd.DataFrame, dctConfig: dict) -> tuple[pd.DataFrame, pd.Series]:

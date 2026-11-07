@@ -24,7 +24,7 @@ pytest.importorskip("httpx")
 from fastapi.testclient import TestClient
 
 from src.app import objBuildApp
-from src.features import tplBuildFeatures
+from src.features import dfRawInputs, tplBuildFeatures
 from src.train import mdlTrainModel, pthSaveModel
 
 
@@ -33,8 +33,8 @@ def objClient(dctConfig, dfSample, tmp_path):
     """A test client for a service built on a small model saved in a temporary folder."""
     dctConfig["model"]["path"] = str(tmp_path / "model.joblib")
     dctConfig["approval"]["model_card_path"] = str(tmp_path / "card.json")
-    dfX, serY = tplBuildFeatures(dfSample, dctConfig)
-    pthSaveModel(mdlTrainModel(dfX, serY, dctConfig), dctConfig["model"]["path"])
+    serY = tplBuildFeatures(dfSample, dctConfig)[1]
+    pthSaveModel(mdlTrainModel(dfRawInputs(dfSample, dctConfig), serY, dctConfig), dctConfig["model"]["path"])
     return TestClient(objBuildApp(dctConfig))
 
 
@@ -61,8 +61,7 @@ def test_predict_returns_one_answer_per_patient_in_order(objClient):
 def test_service_matches_the_model_called_directly(objClient, dctConfig, dfSample):
     """The service gives the same classes as scoring the same rows with the saved model."""
     from src.train import mdlLoadModel
-    dfX, _ = tplBuildFeatures(dfSample, dctConfig)
-    lstExpected = mdlLoadModel(dctConfig["model"]["path"]).predict(dfX).tolist()
+    lstExpected = mdlLoadModel(dctConfig["model"]["path"]).predict(dfRawInputs(dfSample, dctConfig)).tolist()
     lstPatients = dfSample[["feature_a", "feature_b"]].to_dict(orient="records")[:5]
     lstGot = [dctOne["prediction"] for dctOne in objClient.post("/predict", json={"patients": lstPatients}).json()["predictions"]]
     assert lstGot == lstExpected[:5]
@@ -100,8 +99,8 @@ def test_an_unknown_category_is_refused(dctConfig, dfSample, tmp_path):
     dctConfig["features"]["categorical_columns"] = {"group": ["x", "y"]}
     dfData = dfSample.assign(group=["x", "y"] * 10)[["feature_a", "group", "target"]]
     dctConfig["model"]["path"] = str(tmp_path / "model.joblib")
-    dfX, serY = tplBuildFeatures(dfData, dctConfig)
-    pthSaveModel(mdlTrainModel(dfX, serY, dctConfig), dctConfig["model"]["path"])
+    serY = tplBuildFeatures(dfData, dctConfig)[1]
+    pthSaveModel(mdlTrainModel(dfRawInputs(dfData, dctConfig), serY, dctConfig), dctConfig["model"]["path"])
     objClient = TestClient(objBuildApp(dctConfig))
     assert objClient.post("/predict", json={"patients": [{"feature_a": 1, "group": "x"}]}).status_code == 200
     assert objClient.post("/predict", json={"patients": [{"feature_a": 1, "group": "z"}]}).status_code == 422

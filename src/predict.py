@@ -36,7 +36,7 @@ from src.config import subAddConfigArgument, dctLoadConfig
 from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.evaluate import dctComputeMetrics
-from src.features import dfEngineerFeatures
+from src.features import dfRawInputs
 from src.ingest import dfLoadCsv
 from src.train import mdlLoadModel
 
@@ -70,11 +70,9 @@ def dfPredict(mdlModel, dfData: pd.DataFrame, dctConfig: dict) -> pd.DataFrame:
     # The name of the new column is a setting, so it can be changed in the config.
     strPredictionColumn = dctConfig["outputs"]["prediction_column"]
 
-    # Select the feature columns, then build the same calculated and encoded
-    # columns that training used. Skipping this step would feed the model
-    # different columns from the ones it learned on.
-    dfX = dfEngineerFeatures(dfData[lstFeatureColumns], dctConfig)
-    dfOut[strPredictionColumn] = mdlModel.predict(dfX)
+    # Pass only the raw feature columns. The saved pipeline builds the same
+    # calculated and encoded columns that training used, so they cannot differ.
+    dfOut[strPredictionColumn] = mdlModel.predict(dfRawInputs(dfData, dctConfig))
     return dfOut
 
 

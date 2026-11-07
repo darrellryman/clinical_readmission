@@ -22,8 +22,8 @@
     features.categorical_columns), so the API contract can't drift from the
     model's inputs. A patient with a missing field, an extra field, a value of
     the wrong type or a category that isn't on the config list is refused with
-    a 422 error before it reaches the model. Accepted patients go through
-    dfEngineerFeatures, the same function training and predict.py use.
+    a 422 error before it reaches the model. Accepted patients go to the saved
+    pipeline, which builds the engineered columns itself, as it did in training.
 
     The service is for demonstration. The model is trained on synthetic data and
     must not be used to make decisions about real patients.
@@ -48,7 +48,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 import pandas as pd
 
 from src.config import dctLoadConfig
-from src.features import dfEngineerFeatures
+from src.features import dfRawInputs
 from src.train import mdlLoadModel
 
 
@@ -112,7 +112,7 @@ def strBuildFormPage(dctConfig: dict) -> str:
     strHeaderPath = dctConfig["service"].get("header_image")
     blnHeader = bool(strHeaderPath) and Path(strHeaderPath).is_file()
     strHeader = ('<img class="banner" src="/header-image" '
-                 'alt="Doctors and nurses, with the words Your Health Our Expertise hospital">') if blnHeader else ""
+                 'alt="Healthcare banner">') if blnHeader else ""
     # The starting values come from service.form_defaults. A column with none starts blank.
     dctDefaults = dctConfig["service"].get("form_defaults") or {}
     lstRows = []
@@ -266,12 +266,11 @@ def objBuildApp(dctConfig: dict) -> FastAPI:
         Returns:
             One prediction and probability per patient, in the order sent.
         """
-        # One row per patient, in the config's column order, then the same feature
-        # step training used.
-        dfRaw = pd.DataFrame([objPatient.model_dump() for objPatient in objRequest.patients])[lstFeatureColumns]
-        dfX = dfEngineerFeatures(dfRaw, dctConfig)
-        arrPredictions = mdlModel.predict(dfX)
-        arrProbabilities = mdlModel.predict_proba(dfX)[:, intPositive]
+        # One row per patient, in the config's column order. The saved pipeline
+        # builds the engineered columns itself, the same way training did.
+        dfRaw = dfRawInputs(pd.DataFrame([objPatient.model_dump() for objPatient in objRequest.patients]), dctConfig)
+        arrPredictions = mdlModel.predict(dfRaw)
+        arrProbabilities = mdlModel.predict_proba(dfRaw)[:, intPositive]
         return PredictResponse(predictions=[
             PredictionOut(prediction=int(intPrediction), probability=round(float(fltProbability), 4))
             for intPrediction, fltProbability in zip(arrPredictions, arrProbabilities)

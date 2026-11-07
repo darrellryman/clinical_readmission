@@ -21,8 +21,8 @@ pytest.importorskip("matplotlib")
 
 from src.config import subCheckConfig
 from src.plots import lstDrawAllFigures, lstModelSettings, objPlotConfusion, strColour
-from src.train import arrCrossValScores, mdlBuildModel, tplCrossValAuc
-from src.features import tplBuildFeatures, lstSplitData
+from src.train import arrCrossValScores, mdlBuildModel, mdlTrainModel, tplCrossValAuc
+from src.features import dfRawInputs, tplBuildFeatures, lstSplitData
 
 
 def dfMakeData(intRows: int = 200) -> pd.DataFrame:
@@ -44,7 +44,7 @@ def test_four_files_are_written_and_not_empty(dctConfig, tmp_path):
     dfData = dfMakeData()
     dfX, serY = tplBuildFeatures(dfData, dctConfig)
     dfXTrain, _, serYTrain, _ = lstSplitData(dfX, serY, dctConfig)
-    mdlSaved = mdlBuildModel(dctConfig["comparison"]["candidates"]["logistic_regression"], 42).fit(dfXTrain, serYTrain)
+    mdlSaved = mdlTrainModel(dfRawInputs(dfData, dctConfig).loc[dfXTrain.index], serYTrain, dctConfig)
     lstPaths = lstDrawAllFigures(dfData, mdlSaved, dctConfig)
     assert sorted(pth.name for pth in lstPaths) == ["1_roc_pr.png", "2_cv_spread.png", "3_confusion.png", "4_groups.png"]
     for pthFile in lstPaths:
@@ -57,7 +57,7 @@ def test_group_graph_is_skipped_when_no_groups_are_set(dctConfig, tmp_path):
     dfData = dfMakeData()
     dfX, serY = tplBuildFeatures(dfData, dctConfig)
     dfXTrain, _, serYTrain, _ = lstSplitData(dfX, serY, dctConfig)
-    mdlSaved = mdlBuildModel(dctConfig["comparison"]["candidates"]["logistic_regression"], 42).fit(dfXTrain, serYTrain)
+    mdlSaved = mdlTrainModel(dfRawInputs(dfData, dctConfig).loc[dfXTrain.index], serYTrain, dctConfig)
     assert len(lstDrawAllFigures(dfData, mdlSaved, dctConfig)) == 3
 
 
