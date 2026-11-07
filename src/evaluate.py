@@ -31,6 +31,9 @@ import argparse
 
 # json is used to write the metrics in a plain, readable file format.
 import json
+
+import numpy as np
+
 from pathlib import Path
 
 # pandas builds the small result tables (error counts and scores by group).
@@ -67,15 +70,15 @@ def dctComputeMetrics(varYTrue, varYPred, dctConfig: dict, varProbabilities=None
     Returns:
         A dictionary with accuracy, f1, precision and recall, and roc_auc when
         probabilities are given.
-        Accuracy is the share of predictions that were right. When one outcome is
-        rare, accuracy can look good even if the model never predicts it.
-        F1 balances precision and recall. How it is averaged across classes is
-        the evaluation.average setting. The default, "weighted", weights each
-        class by how common it is, so it still means something when classes are uneven.
-        Precision is the share of patients flagged as positive who really were.
-        Recall is the share of real positive patients the model caught.
-        roc_auc is how well the model ranks positives above negatives. 0.5 is a
-        coin flip and 1.0 is perfect.
+        - Accuracy is the share of predictions that were right. When one outcome is
+          rare, accuracy can look good even if the model never predicts it.
+        - F1 balances precision and recall. How it is averaged across classes is
+          the evaluation.average setting. The default, "weighted", weights each
+          class by how common it is, so it still means something when classes are uneven.
+        - Precision is the share of patients flagged as positive who really were.
+        - Recall is the share of real positive patients the model caught.
+          roc_auc is how well the model ranks positives above negatives. 0.5 ranks the
+          readmitted patient higher only half the time and 1.0 is perfect.
     """
     strAverage = dctConfig["evaluation"]["average"]
     varPositive = dctConfig["evaluation"]["positive_label"]
@@ -200,6 +203,185 @@ def dfMetricsByGroup(dfGroups: pd.DataFrame, varYTrue, varYPred, varProbabilitie
     return pd.DataFrame(lstRows)
 
 
+def subPrintEvaluationStrategyEvidence(dctConfig: dict, serYTrain: pd.Series, serYTest: pd.Series) -> None:
+    """Print the evaluation strategy evidence.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        dctConfig: The loaded config.yaml settings.
+        serYTrain: The training targets from lstSplitData.
+        serYTest: The test targets from lstSplitData.
+
+    Returns:
+        None. It only prints.
+    """
+    fltTest = dctConfig["features"]["test_size"]
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Evaluation strategy{STR_RESET}")
+    print(
+        f"{STR_BOLD}Set aside as new patients:{STR_RESET} {dctConfig['data']['new_data_fraction']:.0%} of the cleaned rows")
+    print(f"{STR_BOLD}Train / test split of the rest:{STR_RESET} {1 - fltTest:.0%} / {fltTest:.0%}")
+    print(f"{STR_BOLD}Stratified on the target:{STR_RESET} {dctConfig['features']['stratify']}")
+    print(f"{STR_BOLD}Readmission rate:{STR_RESET} train {serYTrain.mean():.1%}, test {serYTest.mean():.1%}")
+    print(
+        f"{STR_BOLD}Cross-validation folds on the training rows:{STR_RESET} {dctConfig['comparison']['cv_folds']}")
+    print(f"{STR_BOLD}Random seed:{STR_RESET} {dctConfig['project']['random_state']}")
+
+
+def subPrintGroupErrorEvidence(dfByGroup: pd.DataFrame, dctConfig: dict) -> None:
+    """Print the scores by group that the group error answer quotes.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        dfByGroup: The table from dfMetricsByGroup, one row per group.
+        dctConfig: The loaded config.yaml settings.
+
+    Returns:
+        None. It only prints.
+    """
+    dctEvaluation = dctConfig["evaluation"]
+    lstChecked = list(dctEvaluation["group_columns"] or []) + list((dctEvaluation["binned_columns"] or {}).keys())
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Group error evidence{STR_RESET}")
+    print(f"\n{STR_BOLD}Groupings checked:{STR_RESET} {', '.join(lstChecked)}")
+    print(dfByGroup[["group", "rows", "flagged_rate", "recall", "roc_auc"]].round(3).to_string(index=False))
+
+    serLowest = dfByGroup.loc[dfByGroup["recall"].idxmin()]
+    print(f"\n{STR_BOLD}Lowest recall:{STR_RESET} {serLowest['group']}, {serLowest['recall']:.3f}, "
+          f"{int(serLowest['rows'])} test rows, about {round(serLowest['rows'] * serLowest['actual_rate'])} readmissions")
+    print(f"\n{STR_BOLD}Flagged rate across all groups:{STR_RESET} "
+          f"{dfByGroup['flagged_rate'].min():.0%} to {dfByGroup['flagged_rate'].max():.0%}")
+
+def subPrintConsequencesEvidence(dfCounts: pd.DataFrame) -> None:
+    """Print the error counts behind the false positive and false negative answer.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        dfCounts: The one-row table from dfConfusionCounts, with true_positive,
+            false_negative, false_positive and true_negative.
+
+    Returns:
+        None. It only prints.
+    """
+    dctRow = dfCounts.iloc[0].to_dict()
+    intTp, intFn = int(dctRow["true_positive"]), int(dctRow["false_negative"])
+    intFp, intTn = int(dctRow["false_positive"]), int(dctRow["true_negative"])
+    intReadmitted = intTp + intFn
+    intFlagged = intTp + intFp
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Error consequences evidence{STR_RESET}")
+    print(f"\n{STR_BOLD}Readmissions in the test rows:{STR_RESET} {intReadmitted}")
+    print(f"\n{STR_BOLD}False negatives (readmissions missed):{STR_RESET} {intFn} of {intReadmitted}")
+    print(f"\n{STR_BOLD}Patients flagged:{STR_RESET} {intFlagged}")
+    print(f"\n{STR_BOLD}False positives (flagged, not readmitted):{STR_RESET} {intFp}")
+    print(f"\n{STR_BOLD}Share of flagged patients who were false alarms:{STR_RESET} {intFp / intFlagged:.1%}")
+
+
+def subPrintMetricChoiceEvidence(dctConfig: dict, serY: pd.Series, serYTest: pd.Series, dctMetrics: dict) -> None:
+    """Print the figures behind the choice of metrics.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses evaluation.positive_label.
+        serY: The target for all the cleaned rows.
+        serYTest: The target for the test rows.
+        dctMetrics: The scores from dctComputeMetrics for the saved model.
+
+    Returns:
+        None. It only prints.
+    """
+    varPositive = dctConfig["evaluation"]["positive_label"]
+
+    # A model that predicts "no readmission" for everyone is right whenever the patient was not readmitted.
+    fltAlwaysNo = float((serYTest != varPositive).mean())
+    # A do-nothing model gives every patient the same score, so it can't rank anyone: AUC 0.5.
+    fltBaselineAuc = float(roc_auc_score(serYTest, np.zeros(len(serYTest))))
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Metric choice evidence{STR_RESET}")
+    print(f"\n{STR_BOLD}Patients readmitted (all cleaned rows):{STR_RESET} {(serY == varPositive).mean():.1%}")
+    print(f"\n{STR_BOLD}Accuracy if every patient is predicted 'no readmission' (test rows):{STR_RESET} {fltAlwaysNo:.1%}")
+    print(f"\n{STR_BOLD}Do-nothing baseline AUC (test rows):{STR_RESET} {fltBaselineAuc:.3f}")
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Logistic regression, test rows{STR_RESET}")
+    print(f"\n{STR_BOLD}AUC:{STR_RESET} {dctMetrics['roc_auc']:.3f}")
+    print(f"\n{STR_BOLD}Recall:{STR_RESET} {dctMetrics['recall']:.3f}")
+    print(f"\n{STR_BOLD}Precision:{STR_RESET} {dctMetrics['precision']:.3f}")
+    print(f"\n{STR_BOLD}Accuracy:{STR_RESET} {dctMetrics['accuracy']:.3f}")
+
+
+def subPrintRunHistoryEvidence(dctConfig: dict, intLatest: int = 10) -> None:
+    """Print the MLflow run history, then the latest run of each stage in detail.
+
+    Call it in a stage, just below the line of code that gives the evidence for
+    the step. Because it uses print(), the text goes to the stage's RTF file
+    with everything else.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses tracking.enabled,
+            tracking.uri and tracking.experiment_name.
+        intLatest: How many of the most recent runs to list.
+
+    Returns:
+        None. It only prints. If tracking is off, MLflow is missing or no runs
+        exist yet, it says so and carries on.
+    """
+    dctTracking = dctConfig["tracking"]
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}MLflow run history{STR_RESET}")
+    if not dctTracking["enabled"]:
+        print(f"\nMLflow tracking is switched off in config.yaml.")
+        return
+
+    try:
+        import mlflow
+        mlflow.set_tracking_uri(dctTracking["uri"])
+        dfRuns = mlflow.search_runs(experiment_names=[dctTracking["experiment_name"]],
+                                    order_by=["start_time DESC"], max_results=200)
+        objClient = mlflow.MlflowClient()
+    except Exception as objError:  # evidence must not stop the stage
+        print(f"\nCould not read the MLflow history ({type(objError).__name__}: {objError}).")
+        return
+
+    if dfRuns.empty:
+        print(f"\nNo runs recorded yet.")
+        return
+
+    # The list of recent runs: when, which stage, which code and config, and the AUC where there is one.
+    dfShow = pd.DataFrame({
+        "started (UTC)": pd.to_datetime(dfRuns["start_time"]).dt.strftime("%Y-%m-%d %H:%M"),
+        "stage": dfRuns["tags.stage"],
+        "run": dfRuns["tags.mlflow.runName"],
+        "git commit": dfRuns["tags.git_commit"].str[:7],
+        "config": dfRuns["tags.config_fingerprint"],
+        "roc_auc": dfRuns["metrics.roc_auc"].round(3) if "metrics.roc_auc" in dfRuns else None,
+    })
+    print(f"\n{STR_BOLD}Experiment:{STR_RESET} {dctTracking['experiment_name']}, "
+          f"{min(intLatest, len(dfRuns))} most recent of {len(dfRuns)} runs shown\n")
+    print(dfShow.head(intLatest).to_string(index=False))
+
+    # The newest run of each stage, in full: its settings, its fingerprints and the files attached.
+    for strStage in ["train", "evaluate", "compare"]:
+        dfStage = dfRuns[dfRuns["tags.stage"] == strStage]
+        if dfStage.empty:
+            continue
+        objRun = objClient.get_run(dfStage.iloc[0]["run_id"])
+        print(f"\n{STR_BOLD}{STR_UNDERLINE}Latest {strStage} run: {objRun.info.run_name}{STR_RESET}")
+        print(f"\n{STR_BOLD}Settings:{STR_RESET} " + "; ".join(f"{strKey}={varValue}" for strKey, varValue in sorted(objRun.data.params.items())))
+        for strTag in ["git_commit", "raw_data_fingerprint", "data_fingerprint", "config_fingerprint", "model_fingerprint"]:
+            if strTag in objRun.data.tags:
+                print(f"\n{STR_BOLD}{strTag}:{STR_RESET} {objRun.data.tags[strTag]}")
+        lstFiles = [objFile.path for objFile in objClient.list_artifacts(objRun.info.run_id)]
+        print(f"\n{STR_BOLD}Files attached:{STR_RESET} {', '.join(lstFiles)}")
+
 def subMain() -> None:
     """Command line entry point: score the saved model and write the metrics."""
     objParser = argparse.ArgumentParser(description="Evaluate the saved model.")
@@ -229,12 +411,14 @@ def subMain() -> None:
         # rows and ignore the training rows.
         dfData = dfValidate(dfLoadCsv(strInputPath), dctConfig)
         dfX, serY = tplBuildFeatures(dfData, dctConfig)
-        _, dfXTest, _, serYTest = lstSplitData(dfX, serY, dctConfig)
+        _, dfXTest, serYTrain, serYTest = lstSplitData(dfX, serY, dctConfig)
+
+        subPrintEvaluationStrategyEvidence(dctConfig, serYTrain, serYTest)
 
         # The stratified split rebuilt above is the evaluation strategy. Justify the split, the seed and cross-validation.
         subPrintStep(
             "Step 3 - Select and justify a suitable train-validation-test or other evaluation strategy.",
-            "",
+            "Five percent of the cleaned patients are set aside at ingest as new patients, and the rest are split 80/20 into training and test rows. There is no separate validation set. For training rows five-fold cross-validation is used to compare models and drive the approval gate, while test rows are scored once after that. The split is stratified. This means the resulting split has readmission rates of about 14% in both the training and test sets. The split also uses the seed in config.yaml at every stage. A random split was the only option, since there is no date or site column, so results may look better than they would on a later period or a different hospital.",
         )
 
         # Load the trained model and score it on the unseen test rows.
@@ -250,7 +434,9 @@ def subMain() -> None:
         pthOut = Path(strOutputPath)
         pthOut.parent.mkdir(parents=True, exist_ok=True)
         pthOut.write_text(json.dumps(dctMetrics, indent=2))
-        print(f"Metrics written to {pthOut}: {dctMetrics}")
+        print(f"\n{STR_BOLD}{STR_UNDERLINE}Metrics Information{STR_RESET}")
+        print(f"\n{STR_BOLD}Metrics written to:{STR_RESET} {pthOut}")
+        print(f"\n{STR_BOLD}Metrics results:{STR_RESET} {dctMetrics}")
 
         # Record the scores. The model fingerprint ties them to the model file they came from.
         bLogRun(
@@ -265,58 +451,74 @@ def subMain() -> None:
 
         # Count each kind of error, so the cost of a miss or a false alarm can be discussed.
         arrPredictions = mdlModel.predict(dfRawTest)
-        print("\nERROR COUNTS ON THE TEST ROWS")
+        print(f"\n{STR_BOLD}{STR_UNDERLINE}Error Counts On The Test Rows{STR_RESET}\n")
         print(dfConfusionCounts(serYTest, arrPredictions, dctConfig).to_string(index=False))
 
         # Score each group separately. Needs the original columns, so it uses dfData.
         dfGroups = dfBuildGroups(dfData, dfXTest, dctConfig)
         if len(dfGroups.columns) > 0:
-            print("\nSCORES BY GROUP (are errors spread evenly?)")
+            print(f"\n{STR_BOLD}{STR_UNDERLINE}Scores By Group{STR_RESET}\n")
             print(dfMetricsByGroup(dfGroups, serYTest, arrPredictions, arrProbabilities, dctConfig).round(3).to_string(index=False))
 
         dctCard = json.loads(Path(dctConfig["approval"]["model_card_path"]).read_text(encoding="utf-8"))
         print(f"\n{STR_BOLD}Model card status:{STR_RESET} {dctCard['status']}")
-        print(f"{STR_BOLD}Intended use:{STR_RESET} {dctCard['intended_use']}")
-        print(f"{STR_BOLD}Not for:{STR_RESET} {dctCard['not_for']}")
+        print(f"\n{STR_BOLD}Intended use:{STR_RESET} {dctCard['intended_use']}")
+        print(f"\n{STR_BOLD}Not for:{STR_RESET} {dctCard['not_for']}")
         print(
-            f"{STR_BOLD}Recall / precision on test rows:{STR_RESET} {dctMetrics['recall']:.3f} / {dctMetrics['precision']:.3f}")
+            f"\n{STR_BOLD}Recall / precision on test rows:{STR_RESET} {dctMetrics['recall']:.3f} / {dctMetrics['precision']:.3f}")
 
         # The metrics above are the evidence for how the saved model performs on unseen rows.
         # Prints this step, in bold italic, into the RTF file. Write your answer between
         # the quotes on the second line. Use triple quotes if it runs over several lines.
         subPrintStep(
             "Step 1 - Pipeline architecture diagram: describe model evaluation and benchmarking (the evaluation stage).",
-            "",
+            "The saved pipeline is then loaded by evaluate.py and used to score the isolated test rows. The rows used for testing here were not seen by train.py. Accuracy, F1, precision, recall, and ROC AUC are written to metrics.json, error counts and scores by sex and age band are printed, and the run is logged in MLflow with the model’s fingerprint. Benchmarking is done by compare.py on the same rows, which scores the saved model’s type and a random forest against the benchmarks defined in config.yaml, a do-nothing baseline and a simple rule. The results are documented in model_comparison.csv and evaluation_evidence.md.",
         )
+
+        dfGroups = dfBuildGroups(dfData, dfXTest, dctConfig)
+        if len(dfGroups.columns) > 0:
+            dfByGroup = dfMetricsByGroup(dfGroups, serYTest, arrPredictions, arrProbabilities, dctConfig)
+            print(f"\n{STR_BOLD}{STR_UNDERLINE}Scores By Group{STR_RESET}")
+            print(dfByGroup.round(3).to_string(index=False))
+            subPrintGroupErrorEvidence(dfByGroup, dctConfig)
 
         # The scores-by-group table above is the evidence. Read the recall, precision and flagged rate for each group.
         subPrintStep(
             "Step 6 - Consider whether errors may be distributed unevenly across relevant groups.",
-            "",
+            "Yes, errors are spread a little unevenly. The model catches fewer readmissions among men than women (recall 0.593 against 0.637) and ranks them less well (ROC AUC 0.595 against 0.679). The lowest recall is in the 80 to 120 age band (0.480, against 0.603 to 0.667 in the other bands), but that band has only 155 test rows, so the figure is unstable. The model flags a similar share of every group (36 to 40 percent), so the gaps come from how many of the real readmissions it identifies. The only two values that can be checked for this data are sex and age band as there are no columns for ethnicity or Indigenous status.",
         )
+
+        dfCounts = dfConfusionCounts(serYTest, arrPredictions, dctConfig)
+        print(f"\n{STR_BOLD}{STR_UNDERLINE}Error Counts On The Test Rows{STR_RESET}")
+        print(dfCounts.to_string(index=False))
+        subPrintConsequencesEvidence(dfCounts)
 
         # The error counts above give the numbers. Say what a missed readmission costs and what a false alarm costs.
         subPrintStep(
             "Step 6 - Explain the consequences of false positives, false negatives or other important model failures in the context of the selected task.",
-            "",
+            "A false negative is a readmitted patient the model missed, so the patient leaves without the extra monitoring that might have prevented their return. The model missed 99 of the 258 readmissions in the test rows. A false positive is a flagged patient who was not readmitted, which means unnecessary monitoring and clinician time. There were 552 of these, so about 78 percent of flagged patients were false alarms. Assuming extra follow-up is of low risk, we trade off recall against precision. However, many false alarms would likely swamp a clinical team, and we would not wish a model to override a clinician’s decision given the weak signal in this case.",
         )
+
+        subPrintMetricChoiceEvidence(dctConfig, serY, serYTest, dctMetrics)
 
         # The metrics above are the evidence. Say why recall, precision and AUC suit a rare outcome.
         subPrintStep(
             "Step 3 - Evaluate the models using at least one metric suited to the prediction task.",
-            "",
+            "The primary metric of interest for this problem is ROC AUC, since our goal is to rank patients from most likely to be readmitted to least likely to be readmitted. Recall and precision are reported, since both a failure to predict a readmission and a false alarm are costly. Accuracy is reported but can be misleading, as only 14% of patients are readmitted. The implication is that a model that predicts no readmission for everyone would be correct 86% of the time. On the test set the logistic regression achieves an AUC of 0.639, with a recall of 0.616 and a precision of 0.224. The do-nothing baseline achieves an AUC of 0.500.",
         )
+
+        subPrintRunHistoryEvidence(dctConfig)
 
         # The metrics file written above sits in the reports folder. Justify that choice.
         subPrintStep(
             "Step 4 - Use MLflow, a structured metrics and artefact folder, or another justified approach to record model runs and outputs.",
-            "",
+            "Runs are logged locally to a database file (mlflow.db). The report files are overwritten on each run, so MLflow keeps the history. The train, evaluate and compare stages log their settings, scores and output files. Each run is tagged with the Git commit ID and the fingerprints of the data, config and model it used. Outputs go to fixed folders: model.joblib and model_card.json in artifacts, and the reports in reports. The database isn’t committed to Git, because the history belongs to the machine that generated it.",
         )
 
         # Say where each of these is recorded. The metrics are above. The rest is in config.yaml, dvc.lock and the model file.
         subPrintStep(
             "Step 4 - Record relevant information such as: model and preprocessing versions; parameters; evaluation metrics; data or dataset version; configuration; saved model artefacts; experiment results.",
-            "",
+            "Each train, evaluate and compare run is recorded in MLflow with its parameters (model settings, feature rules, test size and random seed), its scores, and tags for the Git commit and the fingerprints of the raw data, cleaned data, config and model. The code and preprocessing version are recorded by the Git commit, as the feature step is saved in the model file as a reference to the code, so that commit has to be checked out to rebuild the same behaviour. Config.yaml is stored with every run, so the exact settings are saved with the results. The saved model and model card (model.joblib and model_card.json, which holds the model, data and config fingerprints) are saved in artifacts/ and copied to the training run, and the scores and comparison results are in reports/ and on the evaluate and compare runs. Library versions are printed in the train report but not stored in MLflow, and most are pinned only to a minimum.",
         )
 
 

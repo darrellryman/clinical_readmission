@@ -197,7 +197,7 @@ The graphs use the same split, folds, models and group bands as `train`, `evalua
 python -m src.app
 ```
 
-Then open `http://127.0.0.1:8000/` for a form where you enter one patient's predictors and it answers "Possible readmission after 30 days: Yes" or "No". The form is built from `features.feature_columns` and `features.categorical_columns`, so it always matches the model's inputs. It starts with typical healthy adult values from `service.form_defaults` in `config.yaml` (assumed mg/dL units, not clinically signed off). Change them there, or set `{}` to start with blank boxes. The banner picture at the top is `assets/header_online.jpg` (the earlier banners are still in `assets/header.jpg` and `assets/header_hospital.jpg`), set by `service.header_image`. Set it to `null` for no banner. Open `http://127.0.0.1:8000/docs` for a test page where you can send patients to the API directly. No Docker is needed. The host, port and the most patients per request are in the `service` section of `config.yaml`.
+Then open `http://127.0.0.1:8000/` for a form where you enter one patient's predictors and it answers "Possible readmission after 30 days: Yes" or "No". The form is built from `features.feature_columns` and `features.categorical_columns`, so it always matches the model's inputs. It starts with typical healthy adult values from `service.form_defaults` in `config.yaml` (assumed mg/dL units, not clinically signed off). Change them there, or set `{}` to start with blank boxes. The banner picture at the top is `assets/header_online.jpg`, set by `service.header_image`. Set it to `null` for no banner. Open `http://127.0.0.1:8000/docs` for a test page where you can send patients to the API directly. No Docker is needed. The host, port and the most patients per request are in the `service` section of `config.yaml`.
 
 | Request | What it does |
 |---|---|
@@ -212,6 +212,40 @@ It is a demonstration. The model is trained on synthetic data and must not be us
 ## Output files
 
 By default, what each stage prints goes to an RTF file instead of the screen, for example `reports/train_output.rtf`. The name comes from `outputs.rtf_path` in the config (`{stage}` becomes the stage name). Tests write to a separate path set under `testing.rtf_path`. Each run overwrites that stage's file.
+
+## Pipeline Output Files
+
+Every file the solution writes when it runs, where it goes and what it holds. Locations are relative to the project root, and most of them come from `config.yaml`. The raw data file (`data/raw/synthetic_clinical_dataset.csv`) is an input, not an output, so it isn't listed.
+
+| Produced by | File | Location | What it holds |
+|---|---|---|---|
+| **Data** | | | |
+| ingest | `clean_synthetic_clinical_dataset.csv` | `data/processed/` | The cleaned patients used for training and testing: the 10 predictors, diagnosis and the readmission_30d answer. Rows with a sex other than Female or Male, or an age outside 18 to 100, are removed, and the set-aside new patients are taken out. 9,196 rows in the shipped run. |
+| ingest | `new_synthetic_clinical_dataset.csv` | `data/new/` | The set-aside new patients (5 percent, 484 in the shipped run), with the same columns but no answer column. Never used for training or testing. |
+| ingest | `new_synthetic_clinical_dataset_answers.csv` | `data/new/` | The real readmission_30d answers for the new patients, in the same row order. Used only to check the predictions. |
+| train | `features.csv` | `data/processed/` | The encoded model inputs (including pulse_pressure and sex_Male), the target and a split column saying train or test. For inspection only. No stage reads it back. |
+| **Model** | | | |
+| train | `model.joblib` | `artifacts/` | The fitted pipeline, saved with joblib: the feature step (dfEngineerFeatures) and the logistic regression. Scores raw patient data on its own. |
+| train | `model_card.json` | `artifacts/` | The model card: parameters, input and model columns, training rows, readmission rate, random seed, fingerprints of the model, data and config, Git commit, gate result, status, intended use, not-for list and known limits. |
+| **Reports** | | | |
+| evaluate | `metrics.json` | `reports/` | Test-row scores for the saved model: accuracy, F1, precision, recall and ROC AUC. |
+| compare | `model_comparison.csv` | `reports/` | One row per model (baseline, age rule, logistic regression, random forest): role, type, cross-validated AUC mean and spread, and the test scores. |
+| compare | `evaluation_evidence.md` | `reports/` | One-page evidence record: intended use, not-for list, results table, recommended model, limits and recommendation. |
+| predict | `predictions.csv` | `reports/` | The new patients' columns plus a prediction column (the model's 0 or 1 for each patient). |
+| ingest, validate, train, evaluate, compare, plots, predict | `{stage}_output.rtf (7 files, for example train_output.rtf)` | `reports/` | Everything each stage prints, saved as a Rich Text file instead of shown on screen, including the bold italic assessment steps and their answers. Each run overwrites its own file. |
+| **Graphs** | | | |
+| plots | `1_roc_pr.png` | `reports/figures/` | ROC and precision-recall curves for each model. |
+| plots | `2_cv_spread.png` | `reports/figures/` | Cross-validated AUC for each fold, by model. |
+| plots | `3_confusion.png` | `reports/figures/` | The error-count grid for the saved model: readmissions found, missed and falsely flagged. |
+| plots | `4_groups.png` | `reports/figures/` | Recall and precision by group (sex and age band). Drawn only when groups are set in the config. |
+| **Run tracking and versioning** | | | |
+| train, evaluate, compare | `mlflow.db` | `Project root` | The MLflow database of runs: settings, scores, and tags for the Git commit and the data, config and model fingerprints. |
+| train, evaluate, compare | `mlruns/` | `Project root` | MLflow's copy of each run's files (model, model card, metrics, comparison table, evidence record), kept per run. |
+| dvc repro | `dvc.lock` | `Project root` | The recorded hashes of every stage's inputs and outputs for the last run, so DVC can tell what changed. |
+| dvc add (setup) | `synthetic_clinical_dataset.csv.dvc` | `data/raw/` | The small pointer file that stands in for the raw data in Git. Created once at setup, not on every run. |
+| dvc add, dvc repro | Hashed copies of tracked files | `.dvc/cache/` | DVC's local cache of the raw data and stage outputs, named by hash. There is no remote, so this is the only copy. |
+| **Test runs** | | | |
+| pytest | `{stage}_output.rtf (5 files)` | `reports/test/` | The RTF output written by the tests, kept apart so a test run never overwrites a real run's reports. |
 
 ## Test
 

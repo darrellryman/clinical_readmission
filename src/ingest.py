@@ -467,7 +467,7 @@ def subMain() -> None:
         # dfLoadCsv above loads the raw data from the path in config.yaml, the same way every run.
         subPrintStep(
             f"\n{STR_BOLD}Step 2 - {STR_RESET}{STR_ITALIC}Implement a repeatable process for loading the raw data from a file, URL or other defined source.{STR_RESET}",
-            "One function, tplLoadRawData, loads the raw data and reads its settings from the config, so every run loads the data the same way.. data.source determines the data source (i.e., whether it is a file or a web address). For files, the raw data is read from data.raw_path. For web addresses, the raw data is downloaded from data.raw_url to the specified path. The download is saved with a temporary file name. Only when the download has completed is the temporary file name replaced with the final file name. Should the download fail for some reason or the resulting file be empty, the run is terminated with a message indicating the problem with the web address or file specified for the test case. In the run report, each run is described by the data source, the location from which the data was loaded, the time it was loaded, and a short file fingerprint. In this case, a local file was read as specified in the config.",
+            "One function, tplLoadRawData, loads the raw data and reads its settings from the config, so every run loads the data the same way. data.source determines the data source (i.e., whether it is a file or a web address). For files, the raw data is read from data.raw_path. For web addresses, the raw data is downloaded from data.raw_url to the specified path. The download is saved with a temporary file name. Only when the download has completed is the temporary file name replaced with the final file name. Should the download fail for some reason or the resulting file be empty, the run is terminated with a message indicating the problem with the web address or file specified for the test case. In the run report, each run is described by the data source, the location from which the data was loaded, the time it was loaded, and a short file fingerprint. In this case, a local file was read as specified in the config.",
         )
 
         # dfLoadCsv above reads one file at a fixed path. Say what happens if that file is late, missing or empty.
@@ -479,7 +479,7 @@ def subMain() -> None:
         # The raw data above is where data authority starts. Say who owns this data and whose consultation would be needed.
         subPrintStep(
             f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Consider cultural safety, data authority and the need for consultation where the data, prediction or proposed use could affect Aboriginal and Torres Strait Islander peoples, communities, Country or knowledge.{STR_RESET}",
-            "The dataset lacks a column (or combination of colums) that allows identification of Indigenous people. Therefore, it is not possible to evaluate how the model is treating Aboriginal and Torres Strait Islander patients. The dataset would need to include data so performance can be reported for First Nations patients, and any use would need to demonstrate a collective benefit for that community/communities. Regarding authority to control use of the data, this would sit with the relevant Aboriginal community and their health service (e.g., an Aboriginal Community Controlled Health Organisation), as well as the hospital’s data governance and an ethics committee with appropriate Aboriginal representation.",
+            "The dataset lacks a column (or combination of columns) that allows identification of Indigenous people. Therefore, it is not possible to evaluate how the model is treating Aboriginal and Torres Strait Islander patients. The dataset would need to include data so performance can be reported for First Nations patients, and any use would need to demonstrate a collective benefit for that community/communities. Regarding authority to control use of the data, this would sit with the relevant Aboriginal community and their health service (e.g., an Aboriginal Community Controlled Health Organisation), as well as the hospital’s data governance and an ethics committee with appropriate Aboriginal representation.",
         )
 
         # The dataset is synthetic and has no ethnicity or Indigenous status column. Say what a real setting would add.
@@ -506,7 +506,7 @@ def subMain() -> None:
         # Set aside some patients as "new" patients, before anything else sees the data.
         dfData, dfNew = tplHoldOutNewPatients(dfData, dctConfig)
         pthNewFile, pthAnswersFile = tplSaveNewPatients(dfNew, dctConfig)
-        print(f"\n{STR_BOLD}{STR_UNDERLINE}CLEANED DATA{STR_RESET}")
+        print(f"\n{STR_BOLD}{STR_UNDERLINE}Cleaned Data{STR_RESET}")
         bDisplayDatasetDetails(dfData)
 
         pthOut = pthSaveCsv(dfData, strOutputPath)
@@ -534,7 +534,7 @@ def subMain() -> None:
         print(f"\n{STR_BOLD}{STR_UNDERLINE}Criteria for Omission{STR_RESET}")
         print(f"\nRows removed outside of allowed values {dctConfig['data']['allowed_values']}")
         print(f"\nRows removed outside of minimum value ({dctConfig['data']['min_value']})," 
-             f"maximum value ({dctConfig['data']['max_value']})\n")
+             f" maximum value ({dctConfig['data']['max_value']})\n")
 
         # Section 1, step 3. Who uses the prediction and who is affected.
         subPrintStep(

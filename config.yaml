@@ -255,9 +255,12 @@ approval:
     - Fairness was checked by sex and age band only. No ethnicity or Indigenous status data exists.
     - Patients outside the age range 18 to 100 were removed, so the model says nothing about children.
   recommendation: >-
-    Do not deploy clinically. Use the pipeline as a working example. Before any
-    real use, test on real data with a time-based split, check fairness across
-    the groups that matter, and have a named person approve the model.
+    Approved for decision support only, in a supervised pilot. Before go-live, the model must be validated 
+    on real patients from the target hospital using a time-based split, show acceptable results across sex, 
+    age band and Indigenous status groups, and be signed off by a named clinical owner and the clinical 
+    safety and privacy leads. It runs in shadow mode first, so staff see its flags without acting on them. 
+    After go-live, the owner reviews performance and flagged-patient volumes by group each quarter, and the 
+    model is retrained or withdrawn if performance drops below the agreed threshold or the patient mix changes.
 
 # The graphs (plots.py). Start it with: python -m src.plots
 # They are drawn from the same split, models and scores the other stages use, so

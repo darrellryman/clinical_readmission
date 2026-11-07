@@ -47,7 +47,7 @@ import pandas as pd
 
 from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep, subPrintPiplineHeader,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 # Records each model as a run in MLflow when tracking is on.
 from src.tracking import bLogRun
@@ -201,7 +201,16 @@ def subMain() -> None:
     strOutputPath = objArgs.output or dctConfig["outputs"]["comparison_path"]
 
     # Everything printed inside this block goes to the RTF file, not the screen.
-    with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "compare"):
+    with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "Compare"):
+        # print the report header
+        subPrintPiplineHeader(
+            "Compare",
+            dctConfig["project"]["client_question"],
+            dctConfig["features"]["target_column"],
+            ", ".join(dctConfig["features"]["feature_columns"]),
+            strInputPath,
+        )
+
         # Same steps as train.py and evaluate.py, so every stage uses the same rows.
         dfData = dfValidate(dfLoadCsv(strInputPath), dctConfig)
         dfX, serY = tplBuildFeatures(dfData, dctConfig)
@@ -214,24 +223,26 @@ def subMain() -> None:
         pthOut.parent.mkdir(parents=True, exist_ok=True)
         dfResults.round(4).to_csv(pthOut, index=False)
 
-        print(f"Training rows: {len(dfXTrain)}. Test rows: {len(dfXTest)}. "
-              f"Cross-validation folds: {dctConfig['comparison']['cv_folds']}.")
-        print(f"Inputs the models see ({dfXTrain.shape[1]}): {', '.join(dfXTrain.columns)}\n")
+        print(f"\n{STR_BOLD}{STR_UNDERLINE}Training Information{STR_RESET}")
+        print(f"\n{STR_BOLD}Training rows:{STR_RESET} {len(dfXTrain)}.")
+        print(f"\n{STR_BOLD}Test rows:{STR_RESET} {len(dfXTest)}.")
+        print(f"\n{STR_BOLD}Cross-validation folds:{STR_RESET} {dctConfig['comparison']['cv_folds']}.")
+        print(f"\n{STR_BOLD}Inputs the models see ({dfXTrain.shape[1]}):{STR_RESET} {', '.join(dfXTrain.columns)}\n")
         print(dfResults.round(3).to_string(index=False))
-        print("\ncv_auc_mean and cv_auc_std: AUC across the cross-validation slices of the training rows.")
-        print("accuracy to roc_auc: scores on the held-out test rows, measured once.")
+        print(f"\n{STR_BOLD}cv_auc_mean and cv_auc_std:{STR_RESET} AUC across the cross-validation slices of the training rows.")
+        print(f"\n{STR_BOLD}accuracy to roc_auc:{STR_RESET} scores on the held-out test rows, measured once.")
 
         # Name the best candidate by cross-validated AUC (not by the test rows, so the test stays unseen).
         dfCandidates = dfResults[dfResults["role"] == "candidate"]
         serBest = dfCandidates.loc[dfCandidates["cv_auc_mean"].idxmax()]
-        print(f"Highest cross-validated AUC among the candidates: {serBest['model']} ({serBest['cv_auc_mean']:.3f}).")
-        print(f"\nResults table saved to {pthOut}")
+        print(f"\n{STR_BOLD}Highest cross-validated AUC among the candidates:{STR_RESET} {serBest['model']} ({serBest['cv_auc_mean']:.3f}).")
+        print(f"\n{STR_BOLD}Results table saved to: {STR_RESET} {pthOut}")
 
         # Write the evaluation evidence record beside the other reports.
         pthEvidence = Path(dctConfig["approval"]["evidence_path"])
         pthEvidence.parent.mkdir(parents=True, exist_ok=True)
         pthEvidence.write_text(strBuildEvidenceRecord(dfResults, dctConfig), encoding="utf-8")
-        print(f"Evaluation evidence record saved to {pthEvidence}")
+        print(f"\n{STR_BOLD}Evaluation evidence record saved to:{STR_RESET} {pthEvidence}")
 
         # Record one run per model, so the baseline and candidates can be compared in MLflow.
         dctSettings = {

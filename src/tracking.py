@@ -13,8 +13,8 @@
 
     Each stage that makes something worth recording (train, evaluate, compare)
     calls subLogRun() at the end. MLflow then keeps one run per call with its
-    settings (parameters), scores (metrics), files (artefacts) and tags. Runs
-    pile up, so you can see how the results changed between changes to config.yaml.
+    settings (parameters), scores (metrics), files (artefacts) and tags. Each
+    run is kept, so you can compare results before and after a change to config.yaml.
 
     Every run is tagged with a fingerprint of the data it used, the Git commit
     of the code, and the stage name. With those tags, another person can work
@@ -22,8 +22,7 @@
 
     Tracking is optional. If tracking.enabled in config.yaml is false, or the
     mlflow package isn't installed, nothing is recorded and the stage carries
-    on normally. That matters because mlflow is one of the harder packages to
-    install on Windows on ARM.
+    on normally.
 
     The tracking location and experiment name come from config.yaml (the
     tracking section).
@@ -36,6 +35,9 @@ import hashlib
 # subprocess asks Git which commit the code is on.
 import subprocess
 from pathlib import Path
+
+# Saves what the stage prints to an RTF file instead of the screen.
+from src.display import (STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 
 
 def strFileFingerprint(varPath) -> str:
@@ -65,8 +67,7 @@ def strGitCommit() -> str:
 
     Returns:
         The short commit hash, with "-dirty" added when there are uncommitted
-        changes (so you know the run did not use exactly that commit). If this
-        is not a Git repository, or Git is not installed, returns "unknown".
+        changes. If this is not a Git repository, or Git is not installed, returns "unknown".
     """
     try:
         strCommit = subprocess.run(
@@ -103,7 +104,7 @@ def bLogRun(dctConfig: dict, strStage: str, strRunName: str, dctParams: dict = N
     """
     dctTracking = dctConfig["tracking"]
     if not dctTracking["enabled"]:
-        print("MLflow tracking is switched off in config.yaml, so this run was not recorded.")
+        print(f"\nMLflow tracking is switched off in config.yaml, so this run was not recorded.")
         return False
 
     # Import here, not at the top of the file, so the pipeline still runs when
@@ -111,7 +112,7 @@ def bLogRun(dctConfig: dict, strStage: str, strRunName: str, dctParams: dict = N
     try:
         import mlflow
     except ImportError:
-        print("MLflow is not installed, so this run was not recorded. Install it with: pip install mlflow")
+        print(f"\nMLflow is not installed, so this run was not recorded. Install it with: pip install mlflow")
         return False
 
     try:
@@ -143,9 +144,11 @@ def bLogRun(dctConfig: dict, strStage: str, strRunName: str, dctParams: dict = N
                 if Path(varPath).is_file():
                     mlflow.log_artifact(str(varPath))
 
-            print(f"Run recorded in MLflow: experiment '{dctTracking['experiment_name']}', "
-                  f"run '{strRunName}', id {objRun.info.run_id}")
+            print(f"\n{STR_BOLD}{STR_UNDERLINE}Run recorded in MLflow{STR_RESET}")
+            print(f"\n{STR_BOLD}Experiment: '{dctTracking['experiment_name']}'{STR_RESET}")
+            print(f"\n{STR_BOLD}Run: '{strRunName}'{STR_RESET}")
+            print(f"\n{STR_BOLD}Id: {objRun.info.run_id}'{STR_RESET}")
         return True
     except Exception as objError:  # noqa: BLE001 - tracking must never stop the pipeline
-        print(f"MLflow could not record this run ({type(objError).__name__}: {objError}). The stage carried on.")
+        print(f"\nMLflow could not record this run ({type(objError).__name__}: {objError}). The stage carried on.")
         return False

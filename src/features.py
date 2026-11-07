@@ -15,7 +15,7 @@
         dfX:  the input columns (features)
         serY: the answer column (target)
     
-    It also splits the data into a training set and a test set. The split lives in
+    It splits the data into a training set and a test set. The split lives in
     this one place so that train.py and evaluate.py always agree on which rows are
     training rows and which are test rows.
     
