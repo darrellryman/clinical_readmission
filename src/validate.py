@@ -286,7 +286,7 @@ def subMain() -> None:
         # the quotes on the second line. Use triple quotes if it runs over several lines.
         subPrintStep(
             "Step 1 - Pipeline architecture diagram: describe data validation.",
-            "Validation is performed by validate.py, the second stage of the pipeline and runs 11 checks on the cleaned data. Several of the checks take their limits from config.yaml. If either of the first two checks fails, the script stops immediately. Failures in the other checks are reported together. Train, evaluate, compare and plots run the same checks first and stop if any of them fail.",
+            "Step 2 - Add checks for relevant data-quality problems, such as: missing or unexpected columns; incorrect data types; missing values; invalid value ranges; duplicate rows; categories outside an expected set; date or time values that cannot be parsed.",
         )
 
         # The rules in dfValidate ran above. Say which of these problems each rule covers and which it does not.
@@ -298,7 +298,7 @@ def subMain() -> None:
         # Validation is one automated check. The pytest tests and the CI workflow are the others.
         subPrintStep(
             "Step 5 - Add automated quality checks through tests, validation scripts, continuous integration workflows or another justified approach.",
-            "Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 183 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file, so be careful when editing config.yaml as you may break the tests. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.",
+            "Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 175 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file, so be careful when editing config.yaml as you may break the tests. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.",
         )
 
         # Describe .github/workflows/ci.yml: when it runs and what it runs.
