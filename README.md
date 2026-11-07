@@ -10,9 +10,7 @@ Course: AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS
 
 Client question: At the point of discharge, will an adult inpatient be readmitted within 30 days?
 
-A Python pipeline that predicts whether an adult patient will be readmitted to hospital within 30 days. 
-
-It trains on a synthetic clinical dataset of 10,000 patients. Rows outside a value range are removed at ingest. As shipped it is age 18 to 100 (`data.min_value`, `data.max_value` and `data.value_column`, all configurable, so you can filter another numeric column or study one band). The data is generated, so nothing here says anything about real patients. See [Limits](#limits).
+A Python pipeline that predicts whether an adult patient will be readmitted to hospital within 30 days. It trains on a synthetic clinical dataset of 10,000 patients. Rows outside a value range are removed at ingest. As shipped it is age 18 to 100 (`data.min_value`, `data.max_value` and `data.value_column`, all configurable, so you can filter another numeric column or study one band). The data is generated, so nothing here says anything about real patients. See [Limits](#limits).
 
 Every setting lives in `config.yaml`: file paths, column names, feature rules, model settings and output names. Change behaviour there and leave the code alone.
 
@@ -170,25 +168,6 @@ There are 10 inputs: age, sex, BMI, systolic and diastolic blood pressure, gluco
 
 One function, `dfEngineerFeatures` in `src/features.py`, builds these columns. It is the first step of the saved pipeline (see `objBuildFeatureStep`), so the model file carries its own feature step and training, `evaluate`, `predict.py` and the web service can't drift apart. You give the saved model raw patient columns and it builds the rest. The sex categories come from the config, and a value that isn't on the list stops the run with an error.
 
-## Results
-
-On 1,840 held-out test patients. About 14 percent of patients are readmitted.
-
-| Model | CV AUC | Test AUC | Accuracy | Recall | Precision |
-|---|---|---|---|---|---|
-| Baseline (always predicts "no") | 0.500 | 0.500 | 0.860 | 0.000 | 0.000 |
-| Logistic regression | 0.606 | 0.639 | 0.646 | 0.616 | 0.224 |
-| Rule: flag age 65 and over | 0.505 | 0.511 | 0.647 | 0.322 | 0.149 |
-| Random forest | 0.599 | 0.636 | 0.653 | 0.612 | 0.227 |
-
-CV AUC is the average over 5 cross-validation folds of the training rows.
-
-What this says: the models find some signal and it is weak. Of the patients the model flags, about 22 percent are readmitted, against a base rate of 14. The baseline has the best accuracy because it never flags anyone, which is why recall and AUC matter here. The age rule is close to a coin flip, so age alone tells you almost nothing here. The random forest is within one standard deviation of logistic regression (0.020), so the gap is noise and the simpler model is the saved one. Pulse pressure and sex add almost nothing. Hypertension, diabetes and creatinine carry most of the signal.
-
-A further 484 patients (5 percent) were set aside before training and never used for it or for these scores. Predicting on them gives accuracy 0.657, recall 0.662 and precision 0.239, in the same range as the test scores.
-
-The table is rebuilt by `python -m src.compare` and saved to `reports/model_comparison.csv`.
-
 ## Approval gate and model card
 
 `train.py` checks the model before saving it. Its cross-validated AUC on the training rows must beat the do-nothing baseline by at least `approval.min_auc_gain` (0.05). A model that fails isn't saved, and the stage stops with `ModelGateError`. The threshold sits in the config because it should come from the intended use and the cost of errors. Passing the gate isn't clinical approval. A named person still has to sign off.
@@ -229,10 +208,6 @@ Then open `http://127.0.0.1:8000/` for a form where you enter one patient's pred
 The request format is built from the config, so it always matches the model's inputs. A missing field, an extra field, a wrong type or a sex value that isn't on the list is refused with a 422 error before it reaches the model. Accepted patients go to the saved pipeline, which builds the engineered columns itself, as it did in training. The service stops at start-up if there is no saved model.
 
 It is a demonstration. The model is trained on synthetic data and must not be used for real patients. The tests in `tests/test_app.py` need the service libraries and are skipped if they aren't installed.
-
-## Assessment prompts in the reports
-
-The stages print the assessment steps, in bold italic, into their RTF files. Each one starts `Step 1 - ` to `Step 6 - ` for the six assessment sections and sits just below the code that gives its evidence. They are `subPrintStep("question", "")` calls in `src/`. Type your answer between the empty quotes, then rerun the stage. A step with no answer prints `(answer not written yet)`, so gaps show up in the report.
 
 ## Output files
 
@@ -305,18 +280,3 @@ Predictions are written to `reports/predictions.csv`. Because these patients wer
 
 To score your own file, pass `python -m src.predict --input your_file.csv`. It needs the same columns as the new-patients file. The comparison with the answers file is skipped in that case. Column names must match the training data exactly, and any sex value other than Female or Male stops the run.
 
-## Limits
-
-- The data is synthetic. Results say nothing about real hospitals or patients.
-- The model is weak. It is a worked example of the pipeline, not a tool for clinical decisions.
-- The classification threshold is the default 0.5. Where to set it is a clinical choice about missed readmissions versus false alarms.
-- 161 rows in the raw file have diastolic pressure at or above systolic. They are still in the data. The age filter is the only range check.
-- Someone with clinical knowledge needs to confirm that each input is known at the moment the prediction would be made.
-- `evaluate.py` prints scores by sex and age band. The data has no ethnicity or Aboriginal and Torres Strait Islander status column, so errors can't be checked for those groups. Cultural safety, data authority and consultation need to be handled before any real use.
-- Leakage and train-serve risks, and what the pipeline does about each, are in `Leakage_And_Train_Serve_Risks.docx`.
-
-## Notes
-
-- `src/__init__.py` makes `src` a package so the programs can import each other.
-- `data/`, `artifacts/` and `reports/` hold a `.gitkeep` so the folders exist in Git. Their contents are ignored.
-- Add a library to `requirements.txt` the moment you import it.

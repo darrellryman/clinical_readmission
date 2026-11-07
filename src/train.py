@@ -752,13 +752,13 @@ def subMain() -> None:
         # The model file saved above is reused by evaluate.py and predict.py. Say what it contains and what it does not.
         subPrintStep(
             "Step 5 - Save the trained preprocessing and modelling pipeline in a form that can be reused.",
-            "",
+            "The fitted pipeline is saved as a single file, artifacts/model.joblib. It holds two steps: the feature step (dfEngineerFeatures) and the logistic regression. It can score raw patient data on its own. evaluate.py, predict.py, plots.py and the web service load it without retraining.",
         )
 
         # The saved model above is only a file. Say who must approve it, and what checks, before anyone uses it.
         subPrintStep(
             "Step 6 - Identify appropriate human oversight, governance and approval requirements before real-world use.",
-            "",
+            "Before any real use, a named person would need to approve it. This solution must be tested on real hospital data, checked for fairness across sex and age bands, and signed off by individuals responsible for clinical safety and privacy. The model would flag patients who need extra monitoring, but a clinician would make the decision and could override the model’s recommendations. The owner of the model would be responsible for monitoring its performance and retraining or withdrawing it as necessary. Before real use, approval would also need to follow the CARE principles, so Aboriginal and Torres Strait Islander people would have authority over how their data is used and the model would need to show collective benefit for their communities.",
         )
 
 

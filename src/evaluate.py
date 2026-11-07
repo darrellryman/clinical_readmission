@@ -43,7 +43,7 @@ from sklearn.metrics import (
 
 from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintStep, subPrintPiplineHeader,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 # Records the run (scores, files, tags) in MLflow when tracking is on.
 from src.tracking import bLogRun, strFileFingerprint
@@ -215,7 +215,16 @@ def subMain() -> None:
     strOutputPath = objArgs.output or dctConfig["outputs"]["metrics_path"]
 
     # Everything printed inside this block goes to the RTF file, not the screen.
-    with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "evaluate"):
+    with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "Evaluate"):
+        # print the report header
+        subPrintPiplineHeader(
+            "Evaluate",
+            dctConfig["project"]["client_question"],
+            dctConfig["features"]["target_column"],
+            ", ".join(dctConfig["features"]["feature_columns"]),
+            strInputPath,
+        )
+
         # Rebuild the same split that train.py used. This time we keep the test
         # rows and ignore the training rows.
         dfData = dfValidate(dfLoadCsv(strInputPath), dctConfig)
@@ -264,6 +273,13 @@ def subMain() -> None:
         if len(dfGroups.columns) > 0:
             print("\nSCORES BY GROUP (are errors spread evenly?)")
             print(dfMetricsByGroup(dfGroups, serYTest, arrPredictions, arrProbabilities, dctConfig).round(3).to_string(index=False))
+
+        dctCard = json.loads(Path(dctConfig["approval"]["model_card_path"]).read_text(encoding="utf-8"))
+        print(f"\n{STR_BOLD}Model card status:{STR_RESET} {dctCard['status']}")
+        print(f"{STR_BOLD}Intended use:{STR_RESET} {dctCard['intended_use']}")
+        print(f"{STR_BOLD}Not for:{STR_RESET} {dctCard['not_for']}")
+        print(
+            f"{STR_BOLD}Recall / precision on test rows:{STR_RESET} {dctMetrics['recall']:.3f} / {dctMetrics['precision']:.3f}")
 
         # The metrics above are the evidence for how the saved model performs on unseen rows.
         # Prints this step, in bold italic, into the RTF file. Write your answer between
