@@ -314,12 +314,12 @@ stages:
       size: 6672
     - path: artifacts/model_card.json
       hash: md5
-      md5: eda38b633f7fba65f957e4b701ac0038
+      md5: ce287b7d5ab48e135cfa2abc8b96a444
       size: 2022
     - path: config.yaml
       hash: md5
-      md5: bccacc2f139731e511dc86cabf82b77a
-      size: 15850
+      md5: 149c9d11c44def6b412ccf9fb41a8beb
+      size: 15917
     - path: data/processed/clean_synthetic_clinical_dataset.csv
       hash: md5
       md5: 2f0bf78321820aa708b723f03bc56abc
@@ -339,16 +339,16 @@ stages:
       size: 383
     - path: src/answers_evidence.py
       hash: md5
-      md5: cf640bd6d97cc00175904ed3c34dae9b
-      size: 75606
+      md5: f8b401676675a563f24a75afbac3df04
+      size: 99717
     - path: src/config.py
       hash: md5
       md5: 641e6c5fe9c9ac9ec463183e32371e46
       size: 12709
     - path: src/display.py
       hash: md5
-      md5: 7f0dd87b362144b301d7e859ad136ee3
-      size: 18252
+      md5: 16539adf80d89799d5aca6fbcd7d1138
+      size: 20126
     - path: src/evaluate.py
       hash: md5
       md5: 67f5c3d0e63138491dcbc5d5b45d06e9
@@ -376,5 +376,5 @@ stages:
     outs:
     - path: reports/answer_evidence_output.rtf
       hash: md5
-      md5: 453602c8690da5845e39b958aa894006
-      size: 544286
+      md5: 12ed207d5a959205999a466ea7fb6e12
+      size: 1212178
