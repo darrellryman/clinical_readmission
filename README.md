@@ -25,6 +25,7 @@ Each stage is its own program. They pass results to each other through files.
 | Train | `python -m src.train` | Builds features, splits train and test, saves the encoded features for inspection, fits logistic regression, checks it against the approval gate, then saves the model and a model card |
 | Evaluate | `python -m src.evaluate` | Scores the model on the test rows, writes the metrics file, and prints the error counts and the scores by sex and age band |
 | Compare | `python -m src.compare` | Trains a baseline, a simple age rule and two candidate models on the same rows, writes one comparison table, and writes an evaluation evidence record |
+| Approve | `python -m src.approve --name ... --role ... --decision approved --reason ...` | A named person records a sign-off for the saved model. `predict` and `serve` refuse to use a model without one. See [Approval gate and model card](#approval-gate-and-model-card) |
 | Predict | `python -m src.predict` | Scores the new patients with the saved pipeline, and checks the predictions against their kept-apart answers |
 | Plots | `python -m src.plots` | Optional. Draws four evidence graphs into `reports/figures/`: ROC and precision-recall curves, cross-validated AUC per fold, the error-count grid, and recall and precision by group. See [Graphs](#graphs) |
 | Answer evidence | `python -m src.answers_evidence` | Run it last. Prints every assessment answer with the evidence that supports it, in pipeline order, into one report. Reads the data, the saved model, the comparison table and MLflow. Trains and writes nothing |
@@ -57,6 +58,7 @@ clinical_readmission/
     evaluate.py       metrics
     compare.py        baseline, rule and candidates, and the evidence record
     tracking.py       records runs in MLflow (optional)
+    approve.py        records a named person's sign-off, and checks it before a model is used
     predict.py        scores new data
     serve.py          the prediction service (FastAPI), optional
     answers_evidence.py   the assessment answers, each below its evidence
@@ -150,6 +152,8 @@ comparison:
 approval:
   enabled: true                          # train.py saves the model only if it passes the gate
   min_auc_gain: 0.05                     # cross-validated AUC must beat the baseline by this much
+  require_signoff: true                  # predict.py and serve.py need a named person's sign-off
+  signoff_path: approvals/signoff.json   # where src.approve writes it. Commit this file
   intended_use: ...                      # text copied into the model card and evidence record
 
 tracking:
@@ -173,6 +177,8 @@ One function, `dfEngineerFeatures` in `src/features.py`, builds these columns. I
 ## Approval gate and model card
 
 `train.py` checks the model before saving it. Its cross-validated AUC on the training rows must beat the do-nothing baseline by at least `approval.min_auc_gain` (0.05). A model that fails isn't saved, and the stage stops with `ModelGateError`. The threshold sits in the config because it should come from the intended use and the cost of errors. Passing the gate isn't clinical approval. A named person still has to sign off.
+
+The sign-off is a separate step. After reading the card and `reports/evaluation_evidence.md`, the person runs `python -m src.approve` with their name, role, decision and reason. It writes `approvals/signoff.json` with the fingerprint of the model they approved. `predict.py` and `serve.py` stop with `ModelNotApprovedError` if the file is missing, the decision is "rejected", or the model file no longer matches the fingerprint. A retrained model that comes out different needs a new sign-off. A failed-gate model can't be approved. Commit the sign-off file to Git, so the history shows who approved what and when. It is a plain file, so a real system would sign it or keep it somewhere with access control. Set `approval.require_signoff` to false to switch the check off.
 
 A model that passes is saved with `artifacts/model_card.json`: the model type and settings, the input columns, the data, config and model fingerprints, the git commit, the gate result, the intended use and the known limits. `compare.py` writes `reports/evaluation_evidence.md`, which pulls the results, the recommended model, the limits and the recommendation into one page.
 
@@ -256,7 +262,7 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 python -m pytest tests
 ```
 
-188 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
+199 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
 
 ## Track runs with MLflow
 

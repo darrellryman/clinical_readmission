@@ -236,6 +236,11 @@ approval:
   # must be. Automating a threshold does not make it meaningful. Set it from the
   # intended use and the cost of errors, and review it when the data or use changes.
   min_auc_gain: 0.05
+  # When true, predict.py and serve.py refuse to use a model unless a named person has
+  # signed it off with python -m src.approve. Retraining clears the sign-off.
+  require_signoff: true
+  # Where src.approve writes the named person's decision. Commit this file to Git.
+  signoff_path: approvals/signoff.json
   # Written beside the saved model: what it is, what built it, and the gate result.
   model_card_path: artifacts/model_card.json
   # Written by compare.py: the intended use, the results table and the recommendation.

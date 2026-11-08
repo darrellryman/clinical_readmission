@@ -53,7 +53,7 @@ import yaml
 from sklearn.metrics import roc_auc_score
 
 from src.config import subAddConfigArgument, dctLoadConfig
-from src.display import (objCaptureToRtf, subPrintStep, subPrintPiplineHeader,
+from src.display import (objCaptureToRtf, subPrintStep, subPrintPiplineHeader, bDisplayDatasetDetails, subPrintImage,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.evaluate import dctComputeMetrics, dfBuildGroups, dfConfusionCounts, dfMetricsByGroup
 from src.features import tplBuildFeatures, lstSplitData, dfRawInputs
@@ -378,17 +378,16 @@ def tplIngestCounts(dctConfig: dict, dfRaw: pd.DataFrame) -> tuple:
     return len(dfRaw), intAfterClean, intAfterValues, len(dfWork)
 
 
-def subPrintRawDataEvidence(dctConfig: dict, dfRaw: pd.DataFrame) -> None:
-    """Print where the raw data came from and a short profile of it.
+def subPrintRawDataEvidence(dctConfig: dict) -> None:
+    """Print where the raw data came from.
 
     Call it in a stage, just below the line of code that gives the evidence for
     the step. Because it uses print(), the text goes to the stage's RTF file
     with everything else.
 
     Args:
-        dctConfig: The loaded config.yaml settings. Uses data.source, data.raw_url,
-            data.raw_path and data.value_column.
-        dfRaw: The raw data.
+        dctConfig: The loaded config.yaml settings. Uses data.source, data.raw_url
+            and data.raw_path.
 
     Returns:
         None. It only prints.
@@ -400,16 +399,6 @@ def subPrintRawDataEvidence(dctConfig: dict, dfRaw: pd.DataFrame) -> None:
     print(f"{STR_BOLD}Location:{STR_RESET} {strLocation}")
     print(f"{STR_BOLD}Local copy read:{STR_RESET} {dctData['raw_path']}")
     print(f"{STR_BOLD}File fingerprint (SHA-256, first 12):{STR_RESET} {strFileFingerprint(dctData['raw_path'])}")
-
-    print(f"\n{STR_BOLD}{STR_UNDERLINE}Raw data profile{STR_RESET}")
-    print(f"{STR_BOLD}Rows:{STR_RESET} {dfRaw.shape[0]}")
-    print(f"{STR_BOLD}Columns:{STR_RESET} {dfRaw.shape[1]}")
-    print(f"{STR_BOLD}Missing values:{STR_RESET} {int(dfRaw.isna().sum().sum())}")
-    print(f"{STR_BOLD}Duplicate rows:{STR_RESET} {int(dfRaw.duplicated().sum())}")
-    print(f"{STR_BOLD}Data types:{STR_RESET} " + ", ".join(f"{intCount} {strType}" for strType, intCount in dfRaw.dtypes.astype(str).value_counts().items()))
-    strValue = dctData["value_column"]
-    if strValue in dfRaw.columns and pd.api.types.is_numeric_dtype(dfRaw[strValue]):
-        print(f"{STR_BOLD}{strValue} minimum and maximum:{STR_RESET} {dfRaw[strValue].min()} and {dfRaw[strValue].max()}")
 
 
 def subPrintTrainingEvidence(dctConfig: dict) -> None:
@@ -485,6 +474,10 @@ def subPrintGraphEvidence(dctConfig: dict) -> None:
     for pthFile in lstFiles:
         print(f"  {pthFile}")
 
+    for pthFile in lstFiles:
+        print(f"\n{STR_BOLD}{pthFile.name}{STR_RESET}")
+        subPrintImage(pthFile)
+
 
 # ---------------------------------------------------------------------------
 # One section for each stage, in pipeline order.
@@ -504,7 +497,10 @@ def subAnswerIngest(dctConfig: dict) -> None:
     # The raw file and the row counts at each cleaning step, rebuilt in memory.
     dfRaw = dfLoadCsv(dctConfig["data"]["raw_path"])
     intRawRows, intAfterClean, intAfterValues, intCleanRows = tplIngestCounts(dctConfig, dfRaw)
-    subPrintRawDataEvidence(dctConfig, dfRaw)
+    subPrintRawDataEvidence(dctConfig)
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Raw Data{STR_RESET}")
+    bDisplayDatasetDetails(dfRaw)
 
     # The profile above is the evidence for the raw data and where it came from.
     subPrintStep(
@@ -1041,7 +1037,7 @@ def subAnswerPlots(dctConfig: dict) -> None:
     # The graphs are the evidence. Say what each one shows and what it means for use.
     subPrintStep(
         "Step 3 - Evaluate the models using at least one metric suited to the prediction task.",
-        "",
+        "All the graphs in this evaluation use the same test data. The ROC curves have AUC values for the saved logistic regression of 0.639, the random forest of 0.636 and the age rule of 0.511 where 0.5 is chance. So all models perform only slightly better than chance. The precision-recall curves for rare events look rather poor and only show marginal improvement over the 14% readmission rate, which is the precision of a model that always flags all patients (and hence has 100% recall). The error grid for the saved logistic regression is shown in the figure below. It reports 159 readmissions found, 99 missed and 552 false alarms.",
     )
 
 

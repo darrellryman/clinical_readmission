@@ -37,6 +37,11 @@ import io
 # re finds the bold, italic and underline codes so they can become RTF styles.
 import re
 
+# struct reads the width and height out of a PNG file, and sys.stdout tells
+# us whether the output is being caught for an RTF file.
+import struct
+import sys
+
 # Path handles file paths the same way on Windows, macOS and Linux.
 from pathlib import Path
 
@@ -50,6 +55,12 @@ STR_ITALIC = "\033[3m"
 STR_UNDERLINE = "\033[4m"
 STR_RESET = "\033[0m"
 STR_LARGE = "\033[26m"
+
+# Markers that wrap a picture's file name and width in the printed text. subPrintImage()
+# writes them, and pthSaveRtf() swaps each pair for the picture itself. They are
+# control characters that never appear in normal text.
+STR_IMAGE_START = "\x02"
+STR_IMAGE_END = "\x03"
 
 # What each ANSI style number becomes in an RTF file. 0 switches everything off.
 DCT_RTF_STYLES = {
@@ -226,6 +237,61 @@ def bDisplayDatasetDetails(dfData) -> bool:
         return False
 
 
+def strBuildRtfImage(varPath, fltWidthInches: float = 6.0) -> str:
+    """Turn a PNG file into the RTF text that shows it as a picture.
+
+    Word and WordPad read the picture straight from the RTF file, so the file is
+    self-contained and needs no image files beside it. The picture is scaled to
+    the width asked for, keeping its shape.
+
+    Args:
+        varPath: The PNG file, as text or a Path.
+        fltWidthInches: How wide the picture is on the page. The text area of a
+            default RTF page is about 6 inches wide.
+
+    Returns:
+        One line of RTF with no line breaks in it. The picture data is written as hex.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If the file is not a PNG.
+    """
+    bytPng = Path(varPath).read_bytes()
+    if bytPng[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError(f"Not a PNG file: {varPath}")
+
+    # A PNG stores its size in pixels at fixed positions near the start of the file.
+    intWidth, intHeight = struct.unpack(">II", bytPng[16:24])
+    intGoalWidth = int(fltWidthInches * 1440)
+    intGoalHeight = int(intGoalWidth * intHeight / intWidth)
+
+    # \picw and \pich are the pixel size. \picwgoal and \pichgoal are the size on the
+    # page in twips (1440 to the inch). No line breaks, because pthSaveRtf turns each one into \par.
+    return (f"{{\\pict\\pngblip\\picw{intWidth}\\pich{intHeight}"
+            f"\\picwgoal{intGoalWidth}\\pichgoal{intGoalHeight} {bytPng.hex()}}}")
+
+
+def subPrintImage(varPath, fltWidthInches: float = 6.0) -> None:
+    """Print a picture, so it appears in the stage's RTF file with the rest of the output.
+
+    Call it like print(), inside a stage. When the output is being saved to an RTF
+    file, the picture is embedded in the file. When it is going to the screen, the
+    file name is printed instead, because a terminal can't show a picture.
+
+    Args:
+        varPath: The PNG file, as text or a Path.
+        fltWidthInches: How wide the picture is on the page, in inches.
+
+    Returns:
+        None. It only prints.
+    """
+    # objCaptureToRtf() sends the output to an io.StringIO, so that is how we know it is being caught.
+    if isinstance(sys.stdout, io.StringIO):
+        print(f"\n{STR_IMAGE_START}{varPath}|{fltWidthInches}{STR_IMAGE_END}\n")
+    else:
+        print(f"\nImage: {varPath}\n")
+
+
 def pthResolveRtfPath(varTemplate, strStage: str) -> Path:
     """Turn the configured RTF name into a real path for one stage.
 
@@ -263,11 +329,23 @@ def pthSaveRtf(strText: str, varPath) -> Path:
             for strNumber in strPiece[2:-1].split(";"):
                 lstOut.append(DCT_RTF_STYLES.get(strNumber, ""))
         else:
-            # RTF treats \ { } as commands, so each one needs a backslash in front.
-            strEscaped = strPiece.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+            # A text piece may hold picture markers from subPrintImage(). Each one becomes
+            # the picture. Everything between them is ordinary text.
+            for strSub in re.split(f"({STR_IMAGE_START}[^{STR_IMAGE_END}]*{STR_IMAGE_END})", strPiece):
+                if strSub.startswith(STR_IMAGE_START):
+                    strFile, strWidth = strSub[1:-1].rsplit("|", 1)
+                    try:
+                        lstOut.append(strBuildRtfImage(strFile, float(strWidth)))
+                    except (OSError, ValueError) as objError:
+                        # A missing or bad picture must not stop the report. Say so in its place.
+                        lstOut.append(f"(picture not shown: {Path(strFile).name}, {type(objError).__name__})")
+                    continue
 
-            # Characters outside plain ASCII are written as \uNNNN? codes.
-            lstOut.append("".join(strChar if ord(strChar) < 128 else f"\\u{ord(strChar)}?" for strChar in strEscaped))
+                # RTF treats \ { } as commands, so each one needs a backslash in front.
+                strEscaped = strSub.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+
+                # Characters outside plain ASCII are written as \uNNNN? codes.
+                lstOut.append("".join(strChar if ord(strChar) < 128 else f"\\u{ord(strChar)}?" for strChar in strEscaped))
     strEscaped = "".join(lstOut)
 
     # \par is the RTF line break. Courier New keeps table columns lined up.

@@ -335,7 +335,7 @@ def dctBuildModelCard(dctConfig: dict, dctGate: dict, dfXTrain, serYTrain, strDa
         "config_fingerprint": strFileFingerprint("config.yaml"),
         "git_commit": strGitCommit(),
         "gate": dctGate,
-        "status": ("Passed the automated gate. A named person must still approve it before any real use."
+        "status": ("Passed the automated gate. Awaiting sign-off: run python -m src.approve before any real use."
                    if dctGate["passed"] else "Failed the automated gate."),
         "intended_use": dctApproval["intended_use"],
         "not_for": dctApproval["not_for"],

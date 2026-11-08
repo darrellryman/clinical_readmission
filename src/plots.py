@@ -46,7 +46,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import precision_recall_curve, roc_auc_score, roc_curve
 
 from src.config import subAddConfigArgument, dctLoadConfig
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintImage, subPrintPiplineHeader,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.evaluate import dfBuildGroups, dfConfusionCounts, dfMetricsByGroup
 from src.features import tplBuildFeatures, lstSplitData, dfRawInputs
@@ -329,8 +329,18 @@ def subMain() -> None:
     objArgs = objParser.parse_args()
 
     dctConfig = dctLoadConfig(objArgs.config)
+    strInputPath = objArgs.input or dctConfig["data"]["processed_path"]
 
-    with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "plots"):
+    with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "Plots"):
+        # Display the file header at the top of the stage output
+        subPrintPiplineHeader(
+            "Plots",
+            dctConfig["project"]["client_question"],
+            dctConfig["features"]["target_column"],
+            ", ".join(dctConfig["features"]["feature_columns"]),
+            strInputPath,
+        )
+
         if not dctConfig["plots"]["enabled"]:
             print("Graphs are switched off (plots.enabled is false in config.yaml).")
             return
@@ -340,6 +350,18 @@ def subMain() -> None:
         print("Graphs written:")
         for pthFile in lstPaths:
             print(f"  {pthFile}")
+
+        # print the graphs in the rtf File
+        pthFolder = Path(dctConfig["plots"]["folder"])
+        lstFiles = sorted(pthFolder.glob("*.png")) if pthFolder.is_dir() else []
+        print(f"\n{STR_BOLD}{STR_UNDERLINE}Graphs{STR_RESET}")
+        if not lstFiles:
+            print(f"No graphs in {pthFolder}. Run python -m src.plots first.")
+
+        for pthFile in lstFiles:
+            print(f"\n{STR_BOLD}{pthFile.name}{STR_RESET}")
+            subPrintImage(pthFile)
+
 
 
 if __name__ == "__main__":

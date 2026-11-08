@@ -49,6 +49,7 @@ import pandas as pd
 
 from src.config import dctLoadConfig
 from src.features import dfRawInputs
+from src.approve import subRequireSignoff
 from src.train import mdlLoadModel
 
 
@@ -210,9 +211,11 @@ def objBuildApp(dctConfig: dict) -> FastAPI:
 
     Raises:
         FileNotFoundError: If there is no saved model. Run src.train first.
+        ModelNotApprovedError: If approval.require_signoff is on and no named person has approved the model.
     """
     # Load the model once, here, not on every request. This fails at start-up if
     # the model is missing, which is better than failing on the first patient.
+    subRequireSignoff(dctConfig)
     mdlModel = mdlLoadModel(dctConfig["model"]["path"])
     lstFeatureColumns = dctConfig["features"]["feature_columns"]
     varPositive = dctConfig["evaluation"]["positive_label"]

@@ -35,6 +35,7 @@ from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
 from src.display import (objCaptureToRtf, bDisplayDatasetDetails,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
+from src.approve import subRequireSignoff
 from src.evaluate import dctComputeMetrics
 from src.features import dfRawInputs
 from src.ingest import dfLoadCsv
@@ -92,6 +93,8 @@ def subMain() -> None:
 
     # Everything printed inside this block goes to the RTF file, not the screen.
     with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "predict"):
+        # Refuse to score patients with a model no named person has approved.
+        subRequireSignoff(dctConfig, strModelPath)
         mdlModel = mdlLoadModel(strModelPath)
         dfResult = dfPredict(mdlModel, dfLoadCsv(strInputPath), dctConfig)
 
