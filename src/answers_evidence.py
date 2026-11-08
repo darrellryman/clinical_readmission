@@ -1264,7 +1264,7 @@ def subAnswerCompare(dctConfig: dict) -> None:
     )
 
     # The README and Git guide hold the steps. Summarise them here.
-    subPrintVersionEvidence(dctConfig)
+    subPrintVersionEvidence()
     subPrintStep(
         "Step 4 - Provide sufficient set-up and run instructions for another person to reproduce the result.",
         "The README has a “Reproduce the results from a fresh clone” section. In short: clone the repository, make a Python 3.12 virtual environment, run pip install -r requirements.txt, download the raw CSV from Kaggle into data/raw/, then run the tests and the stages in order (or dvc repro), with a named person running src.approve before src.predict will work. Every setting is in config.yaml, and the README lists the expected results, such as a test AUC of 0.639, so they can check their run.",
