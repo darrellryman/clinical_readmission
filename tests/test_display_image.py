@@ -41,3 +41,19 @@ def test_print_image_on_screen_prints_name(tmp_path):
     with redirect_stdout(objOut):
         subPrintImage("a.png")
     assert "a.png" in objOut.getvalue()
+
+
+def test_build_rtf_image_reads_a_jpeg(tmp_path):
+    from PIL import Image
+    pthFile = tmp_path / "g.jpg"
+    Image.new("RGB", (40, 10), "red").save(pthFile, "JPEG")
+    strRtf = strBuildRtfImage(pthFile, 6.0)
+    assert "\\jpegblip" in strRtf and "\\picw40\\pich10" in strRtf
+    assert "\\picwgoal8640\\pichgoal2160" in strRtf
+
+
+def test_build_rtf_image_rejects_other_files(tmp_path):
+    pthFile = tmp_path / "x.gif"
+    pthFile.write_bytes(b"GIF89a....")
+    with pytest.raises(ValueError, match="PNG or JPEG"):
+        strBuildRtfImage(pthFile)

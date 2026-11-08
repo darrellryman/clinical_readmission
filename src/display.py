@@ -237,15 +237,58 @@ def bDisplayDatasetDetails(dfData) -> bool:
         return False
 
 
+def tplReadImageSize(bytImage: bytes, varName="image") -> tuple:
+    """Work out what kind of picture some bytes are, and how big it is in pixels.
+
+    Only PNG and JPEG are understood, because those are the two kinds RTF can hold
+    directly. Both store their size in the file itself, so no image library is needed.
+
+    Args:
+        bytImage: The whole file, as bytes.
+        varName: The file name, used only in the error message.
+
+    Returns:
+        A tuple of (RTF picture keyword, width in pixels, height in pixels). The
+        keyword is "pngblip" or "jpegblip".
+
+    Raises:
+        ValueError: If the bytes are not a PNG or a JPEG, or a JPEG has no size in it.
+    """
+    if bytImage[:8] == b"\x89PNG\r\n\x1a\n":
+        # A PNG stores its size at fixed positions near the start of the file.
+        intWidth, intHeight = struct.unpack(">II", bytImage[16:24])
+        return "pngblip", intWidth, intHeight
+
+    if bytImage[:2] == b"\xff\xd8":
+        # A JPEG is a series of segments, each starting with 0xFF and a marker byte.
+        # The "start of frame" segments hold the height and then the width.
+        lstFrameMarkers = [0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF]
+        intPos = 2
+        while intPos + 4 <= len(bytImage) and bytImage[intPos] == 0xFF:
+            intMarker = bytImage[intPos + 1]
+            if intMarker == 0xFF:
+                # Padding byte. Move on one.
+                intPos += 1
+                continue
+            if intMarker in lstFrameMarkers:
+                intHeight, intWidth = struct.unpack(">HH", bytImage[intPos + 5:intPos + 9])
+                return "jpegblip", intWidth, intHeight
+            # Any other segment: its length (which includes the two length bytes) says how far to skip.
+            intPos += 2 + struct.unpack(">H", bytImage[intPos + 2:intPos + 4])[0]
+        raise ValueError(f"Could not find the size of the JPEG: {varName}")
+
+    raise ValueError(f"Not a PNG or JPEG file: {varName}")
+
+
 def strBuildRtfImage(varPath, fltWidthInches: float = 6.0) -> str:
-    """Turn a PNG file into the RTF text that shows it as a picture.
+    """Turn a PNG or JPEG file into the RTF text that shows it as a picture.
 
     Word and WordPad read the picture straight from the RTF file, so the file is
     self-contained and needs no image files beside it. The picture is scaled to
     the width asked for, keeping its shape.
 
     Args:
-        varPath: The PNG file, as text or a Path.
+        varPath: The PNG or JPEG file, as text or a Path.
         fltWidthInches: How wide the picture is on the page. The text area of a
             default RTF page is about 6 inches wide.
 
@@ -254,21 +297,17 @@ def strBuildRtfImage(varPath, fltWidthInches: float = 6.0) -> str:
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If the file is not a PNG.
+        ValueError: If the file is not a PNG or a JPEG.
     """
-    bytPng = Path(varPath).read_bytes()
-    if bytPng[:8] != b"\x89PNG\r\n\x1a\n":
-        raise ValueError(f"Not a PNG file: {varPath}")
-
-    # A PNG stores its size in pixels at fixed positions near the start of the file.
-    intWidth, intHeight = struct.unpack(">II", bytPng[16:24])
+    bytImage = Path(varPath).read_bytes()
+    strKind, intWidth, intHeight = tplReadImageSize(bytImage, varPath)
     intGoalWidth = int(fltWidthInches * 1440)
     intGoalHeight = int(intGoalWidth * intHeight / intWidth)
 
     # \picw and \pich are the pixel size. \picwgoal and \pichgoal are the size on the
     # page in twips (1440 to the inch). No line breaks, because pthSaveRtf turns each one into \par.
-    return (f"{{\\pict\\pngblip\\picw{intWidth}\\pich{intHeight}"
-            f"\\picwgoal{intGoalWidth}\\pichgoal{intGoalHeight} {bytPng.hex()}}}")
+    return (f"{{\\pict\\{strKind}\\picw{intWidth}\\pich{intHeight}"
+            f"\\picwgoal{intGoalWidth}\\pichgoal{intGoalHeight} {bytImage.hex()}}}")
 
 
 def subPrintImage(varPath, fltWidthInches: float = 6.0) -> None:
@@ -279,7 +318,7 @@ def subPrintImage(varPath, fltWidthInches: float = 6.0) -> None:
     file name is printed instead, because a terminal can't show a picture.
 
     Args:
-        varPath: The PNG file, as text or a Path.
+        varPath: The PNG or JPEG file, as text or a Path.
         fltWidthInches: How wide the picture is on the page, in inches.
 
     Returns:

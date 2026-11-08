@@ -72,3 +72,33 @@ def test_graph_evidence_says_so_when_there_are_no_graphs(dctConfig, tmp_path, ca
     dctConfig["plots"]["folder"] = str(tmp_path / "no_figures")
     subPrintGraphEvidence(dctConfig)
     assert "Run python -m src.plots first" in strPlain(capsys.readouterr().out)
+
+
+def test_model_score_evidence_prints_scores_and_gap(dctConfig, tmp_path, capsys):
+    import pandas as pd
+    from src.answers_evidence import subPrintModelScoreEvidence
+    pd.DataFrame({
+        "model": ["baseline", "logistic_regression", "random_forest"],
+        "role": ["baseline", "candidate", "candidate"],
+        "cv_auc_mean": [0.5, 0.606, 0.599], "cv_auc_std": [0.0, 0.020, 0.024], "roc_auc": [0.5, 0.639, 0.636],
+    }).to_csv(tmp_path / "t.csv", index=False)
+    dctConfig["outputs"]["comparison_path"] = str(tmp_path / "t.csv")
+    dctConfig["comparison"]["cv_folds"] = 5
+    subPrintModelScoreEvidence(dctConfig)
+    strOut = capsys.readouterr().out
+    assert "test AUC 0.639" in strOut and "cross-validated AUC 0.6060" in strOut
+    assert "a gap of 0.0070" in strOut and "smaller than the spread" in strOut
+
+
+def test_model_score_evidence_without_table(dctConfig, tmp_path, capsys):
+    from src.answers_evidence import subPrintModelScoreEvidence
+    dctConfig["outputs"]["comparison_path"] = str(tmp_path / "missing.csv")
+    subPrintModelScoreEvidence(dctConfig)
+    assert "Run python -m src.compare first" in capsys.readouterr().out
+
+
+def test_diagram_evidence_without_png(tmp_path, monkeypatch, capsys):
+    from src import answers_evidence
+    monkeypatch.setattr(answers_evidence, "STR_DIAGRAM_FILE", str(tmp_path / "none.png"))
+    answers_evidence.subPrintDiagramEvidence()
+    assert "Export the slide as a JPEG" in capsys.readouterr().out

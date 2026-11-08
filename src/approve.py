@@ -40,6 +40,7 @@
 import argparse
 import datetime
 import json
+import sys
 from pathlib import Path
 
 from src.config import subAddConfigArgument, dctLoadConfig
@@ -157,13 +158,48 @@ def subRequireSignoff(dctConfig: dict, strModelPath: str = None) -> None:
     pthSignoff = pthSignoffFile(dctConfig)
     dctSignoff = json.loads(pthSignoff.read_text(encoding="utf-8")) if pthSignoff.is_file() else None
     if not dctSignoff:
-        raise ModelNotApprovedError("This model has no sign-off. A named person must run python -m src.approve first.")
+        raise ModelNotApprovedError("This model has no sign-off.")
     if dctSignoff.get("decision") != "approved":
         raise ModelNotApprovedError(f"This model was {dctSignoff.get('decision')} by {dctSignoff.get('name')}.")
 
     strFingerprint = strFileFingerprint(strModelPath or dctConfig["model"]["path"])
     if dctSignoff.get("model_fingerprint") != strFingerprint:
         raise ModelNotApprovedError("The model file has changed since it was approved. It needs a new sign-off.")
+
+
+def strNotApprovedMessage(objError: Exception, dctConfig: dict) -> str:
+    """Build the message shown when a model is blocked for lack of approval.
+
+    Args:
+        objError: The ModelNotApprovedError that was raised. Its text says why.
+        dctConfig: The loaded config.yaml settings. Uses approval.model_card_path
+            and approval.signoff_path.
+
+    Returns:
+        Plain text that says what is wrong and the exact command that fixes it.
+    """
+    return (
+        "\nMODEL NOT APPROVED\n"
+        f"{objError}\n\n"
+        "Approval from a named person must be obtained before this model can be used.\n"
+        f"Review {dctConfig['approval']['model_card_path']} and {dctConfig['approval']['evidence_path']}, then run:\n\n"
+        '    python -m src.approve --name "..." --role "..." --decision approved --reason "..."\n\n'
+        f"The decision is recorded in {pthSignoffFile(dctConfig)}. Commit that file to Git.\n"
+    )
+
+
+def subExitNotApproved(objError: Exception, dctConfig: dict) -> None:
+    """Show the not-approved message on the screen and stop with exit code 1.
+
+    Args:
+        objError: The ModelNotApprovedError that was raised.
+        dctConfig: The loaded config.yaml settings.
+
+    Returns:
+        None. It never returns. It ends the program, so a script or CI job sees a failure.
+    """
+    print(strNotApprovedMessage(objError, dctConfig), file=sys.stderr)
+    sys.exit(1)
 
 
 def subMain() -> None:

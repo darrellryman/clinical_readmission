@@ -9,7 +9,7 @@
 
     predict.py
     
-    Stage 6 of the pipeline: prediction on new data.
+    Stage 7 of the pipeline: prediction on new data.
     
     Loads the saved model and uses it to score a CSV of new rows. The new file only
     needs the feature columns. It does not need a target column, because the target
@@ -33,9 +33,9 @@ import pandas as pd
 
 from src.config import subAddConfigArgument, dctLoadConfig
 # Saves what the stage prints to an RTF file instead of the screen.
-from src.display import (objCaptureToRtf, bDisplayDatasetDetails,
+from src.display import (objCaptureToRtf, bDisplayDatasetDetails, subPrintPiplineHeader,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
-from src.approve import subRequireSignoff
+from src.approve import ModelNotApprovedError, strNotApprovedMessage, subExitNotApproved, subRequireSignoff
 from src.evaluate import dctComputeMetrics
 from src.features import dfRawInputs
 from src.ingest import dfLoadCsv
@@ -76,6 +76,55 @@ def dfPredict(mdlModel, dfData: pd.DataFrame, dctConfig: dict) -> pd.DataFrame:
     dfOut[strPredictionColumn] = mdlModel.predict(dfRawInputs(dfData, dctConfig))
     return dfOut
 
+def subPredictAll(objArgs, dctConfig: dict, strInputPath: str, strModelPath: str, strOutputPath: str) -> None:
+    """Check the sign-off, score the CSV, save the predictions and score them against the kept-apart answers.
+
+    Args:
+        objArgs: The parsed command line. Uses input.
+        dctConfig: The loaded config.yaml settings.
+        strInputPath: The CSV to score.
+        strModelPath: The saved model file.
+        strOutputPath: Where to write the predictions.
+
+    Returns:
+        None. It prints, and writes the predictions file.
+
+    Raises:
+        ModelNotApprovedError: If no named person has approved the model. The message is printed first.
+    """
+    # Refuse to score patients with a model no named person has approved.
+    try:
+        subRequireSignoff(dctConfig, strModelPath)
+    except ModelNotApprovedError as objError:
+        print(strNotApprovedMessage(objError, dctConfig))
+        raise
+    mdlModel = mdlLoadModel(strModelPath)
+    dfResult = dfPredict(mdlModel, dfLoadCsv(strInputPath), dctConfig)
+
+    # Save the results, creating the folder if needed.
+    pthOut = Path(strOutputPath)
+    pthOut.parent.mkdir(parents=True, exist_ok=True)
+    dfResult.to_csv(pthOut, index=False)
+    print(f"\nWrote {len(dfResult)} predictions to {pthOut}")
+
+    # When the input is the set-aside new patients file, their real answers are
+    # kept apart. Compare them with the predictions so the run shows how the
+    # model does on patients it has never seen. Not done when --input is used,
+    # because those rows would not line up with the answers file.
+    pthAnswers = Path(dctConfig["data"]["new_data_answers_path"])
+    if objArgs.input is None and pthAnswers.is_file():
+        serAnswers = pd.read_csv(pthAnswers)[dctConfig["features"]["target_column"]]
+        if len(serAnswers) == len(dfResult):
+            dctNewScores = dctComputeMetrics(serAnswers, dfResult[dctConfig["outputs"]["prediction_column"]], dctConfig)
+            print(f"\n{STR_BOLD}SCORES ON {len(dfResult)} NEW PATIENTS (answers kept apart from the model){STR_RESET}")
+            print(f"\n{dctNewScores}")
+        else:
+            print(f"\nThe answers file has a different number of rows from the new patients file, so it was not used.")
+
+
+
+
+
 
 def subMain() -> None:
     """Command line entry point: score a CSV and write the predictions."""
@@ -92,30 +141,23 @@ def subMain() -> None:
     strOutputPath = objArgs.output or dctConfig["outputs"]["predictions_path"]
 
     # Everything printed inside this block goes to the RTF file, not the screen.
-    with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "predict"):
-        # Refuse to score patients with a model no named person has approved.
-        subRequireSignoff(dctConfig, strModelPath)
-        mdlModel = mdlLoadModel(strModelPath)
-        dfResult = dfPredict(mdlModel, dfLoadCsv(strInputPath), dctConfig)
+    try:
+        with objCaptureToRtf(dctConfig["outputs"]["rtf_path"], "Predict"):
+            # Display the file header at the top of the stage output
+            subPrintPiplineHeader(
+                "Predict",
+                dctConfig["project"]["client_question"],
+                dctConfig["features"]["target_column"],
+                ", ".join(dctConfig["features"]["feature_columns"]),
+                strInputPath,
+            )
 
-        # Save the results, creating the folder if needed.
-        pthOut = Path(strOutputPath)
-        pthOut.parent.mkdir(parents=True, exist_ok=True)
-        dfResult.to_csv(pthOut, index=False)
-        print(f"Wrote {len(dfResult)} predictions to {pthOut}")
+            subPredictAll(objArgs, dctConfig, strInputPath, strModelPath, strOutputPath)
 
-        # When the input is the set-aside new patients file, their real answers are
-        # kept apart. Compare them with the predictions so the run shows how the
-        # model does on patients it has never seen. Not done when --input is used,
-        # because those rows would not line up with the answers file.
-        pthAnswers = Path(dctConfig["data"]["new_data_answers_path"])
-        if objArgs.input is None and pthAnswers.is_file():
-            serAnswers = pd.read_csv(pthAnswers)[dctConfig["features"]["target_column"]]
-            if len(serAnswers) == len(dfResult):
-                dctNewScores = dctComputeMetrics(serAnswers, dfResult[dctConfig["outputs"]["prediction_column"]], dctConfig)
-                print(f"\nSCORES ON {len(dfResult)} NEW PATIENTS (answers kept apart from the model): {dctNewScores}")
-            else:
-                print("The answers file has a different number of rows from the new patients file, so it was not used.")
+    except ModelNotApprovedError as objError:
+        # The RTF file already holds the message. Show it on the screen too and stop cleanly.
+        subExitNotApproved(objError, dctConfig)
+
 
 
 if __name__ == "__main__":

@@ -237,7 +237,8 @@ approval:
   # intended use and the cost of errors, and review it when the data or use changes.
   min_auc_gain: 0.05
   # When true, predict.py and serve.py refuse to use a model unless a named person has
-  # signed it off with python -m src.approve. Retraining clears the sign-off.
+  # signed it off with python -m src.approve. A retrained model that comes out different
+  # no longer matches the sign-off and needs a new one.
   require_signoff: true
   # Where src.approve writes the named person's decision. Commit this file to Git.
   signoff_path: approvals/signoff.json

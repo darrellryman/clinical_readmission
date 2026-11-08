@@ -73,3 +73,21 @@ def test_name_role_and_reason_are_required(dctSetup):
         dctRecordSignoff(dctSetup[0], " ", "Clinical owner", "approved", "Fine.")
     with pytest.raises(ValueError):
         dctRecordSignoff(dctSetup[0], "Dr Smith", "Clinical owner", "maybe", "Fine.")
+
+
+def test_not_approved_message_gives_the_command(dctSetup):
+    from src.approve import strNotApprovedMessage
+    dctConfig = dctSetup[0]
+    dctConfig["approval"]["evidence_path"] = "reports/evaluation_evidence.md"
+    strMessage = strNotApprovedMessage(ModelNotApprovedError("This model has no sign-off."), dctConfig)
+    assert "MODEL NOT APPROVED" in strMessage
+    assert 'python -m src.approve --name "..." --role "..." --decision approved --reason "..."' in strMessage
+
+
+def test_exit_not_approved_stops_with_code_1(dctSetup, capsys):
+    from src.approve import subExitNotApproved
+    dctSetup[0]["approval"]["evidence_path"] = "reports/evaluation_evidence.md"
+    with pytest.raises(SystemExit) as objExit:
+        subExitNotApproved(ModelNotApprovedError("x"), dctSetup[0])
+    assert objExit.value.code == 1
+    assert "MODEL NOT APPROVED" in capsys.readouterr().err

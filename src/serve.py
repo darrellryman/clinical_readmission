@@ -49,7 +49,7 @@ import pandas as pd
 
 from src.config import dctLoadConfig
 from src.features import dfRawInputs
-from src.approve import subRequireSignoff
+from src.approve import ModelNotApprovedError, subExitNotApproved, subRequireSignoff
 from src.train import mdlLoadModel
 
 
@@ -293,7 +293,11 @@ def subMain() -> None:
     import uvicorn
 
     dctConfig = dctLoadConfig()
-    uvicorn.run(objBuildApp(dctConfig), host=dctConfig["service"]["host"], port=dctConfig["service"]["port"])
+    try:
+        objApp = objBuildApp(dctConfig)
+    except ModelNotApprovedError as objError:
+        subExitNotApproved(objError, dctConfig)
+    uvicorn.run(objApp, host=dctConfig["service"]["host"], port=dctConfig["service"]["port"])
 
 
 if __name__ == "__main__":

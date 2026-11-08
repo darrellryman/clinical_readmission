@@ -86,6 +86,40 @@ python src/check_setup.py
 
 The last line lists what is installed and prints one `pip` command for anything missing. On Windows on ARM, a few packages need pinning or a two-step install. The Git setup guide covers those.
 
+## Reproduce the results from a fresh clone
+
+Everything below runs from the project root. Python 3.12 is what the automated checks use. Git, and a free Kaggle account for the data, are the only things you need besides Python.
+
+1. Get the code and set up. Clone the repository, then follow [Setup](#setup) to make the virtual environment and install `requirements.txt`. `python src/check_setup.py` should report nothing missing.
+2. Get the raw data. It isn't in the repository, so follow [Getting the raw data](#getting-the-raw-data) and save it as `data/raw/synthetic_clinical_dataset.csv`.
+3. Run the tests: `python -m pytest tests -q`. All of them should pass.
+4. Run the pipeline, in this order:
+
+```
+python -m src.ingest
+python -m src.validate
+python -m src.train
+python -m src.evaluate
+python -m src.compare
+python -m src.plots
+```
+
+   Or run `dvc repro` instead, after the one-time steps in [Reproduce with DVC](#reproduce-with-dvc).
+5. Approve the model. `predict` and `serve` refuse to use a model without a sign-off, so a named person runs `python -m src.approve --name "..." --role "..." --decision approved --reason "..."` (see [Approval gate and model card](#approval-gate-and-model-card)).
+6. Score the new patients with `python -m src.predict`, then write the answers report with `python -m src.answers_evidence`.
+
+The random seed and every setting live in `config.yaml`, and models run on one thread, so the same data, settings and library versions give the same numbers. You can check your run against these figures from the reference run:
+
+| Result | Expected |
+|---|---|
+| Rows after cleaning | 9,196 (116 removed for sex "Other", 204 for age outside 18 to 100) |
+| Training rows | 7,356 |
+| Cross-validated AUC, logistic regression | 0.606, baseline 0.500, gain 0.106 (the gate needs 0.05) |
+| Test AUC | logistic regression 0.639, random forest 0.636, age rule 0.511, baseline 0.500 |
+| Test error counts (saved model) | 159 found, 99 missed, 552 false alarms, 1,030 correct |
+
+Small differences in the third decimal can appear if library versions differ. `requirements.txt` sets minimum versions for most libraries and pins only the MLflow ones, so a newer scikit-learn may move a score slightly. Every output file is listed in [Output files](#output-files).
+
 ## Loading the raw data
 
 `data.source` in `config.yaml` says where the raw data comes from, and ingest loads it the same way every run.
@@ -262,7 +296,7 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 python -m pytest tests
 ```
 
-199 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
+208 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
 
 ## Track runs with MLflow
 
@@ -313,7 +347,7 @@ Ingest sets aside a share of patients (`data.new_data_fraction`, 5 percent by de
 - `data/new/new_synthetic_clinical_dataset.csv`: the patients without the answer column
 - `data/new/new_synthetic_clinical_dataset_answers.csv`: their real answers, in the same row order
 
-Then:
+Run `python -m src.approve` first if the model has no sign-off yet (see [Approval gate and model card](#approval-gate-and-model-card)). Then:
 
 ```
 python -m src.predict

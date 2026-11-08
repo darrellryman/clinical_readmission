@@ -50,8 +50,12 @@ import pandas as pd
 # yaml reads dvc.lock.
 import yaml
 
-from sklearn.metrics import roc_auc_score
 
+from sklearn.metrics import roc_auc_score, recall_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+from src.approve import pthSignoffFile
 from src.config import subAddConfigArgument, dctLoadConfig
 from src.display import (objCaptureToRtf, subPrintStep, subPrintPiplineHeader, bDisplayDatasetDetails, subPrintImage,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
@@ -59,7 +63,7 @@ from src.evaluate import dctComputeMetrics, dfBuildGroups, dfConfusionCounts, df
 from src.features import tplBuildFeatures, lstSplitData, dfRawInputs
 from src.ingest import dfLoadCsv, dfKeepColumns, dfCleanData, dfFilterAllowedValues, dfFilterValueRange
 from src.tracking import strFileFingerprint, strGitCommit
-from src.train import mdlLoadModel
+from src.train import arrCrossValScores, mdlBuildModel, mdlLoadModel
 from src.validate import dfValidate
 
 
@@ -354,6 +358,10 @@ def subPrintDataSplitEvidence(dctConfig: dict, dfXTrain: pd.DataFrame, dfXTest: 
           f"train {(1 - fltNew) * (1 - fltTest):.1%}, test {(1 - fltNew) * fltTest:.1%}, new patients {fltNew:.1%}")
 
 
+# The architecture diagram, exported from the PowerPoint slide as a JPEG.
+STR_DIAGRAM_FILE = "artifacts/Pipeline_Architecture_Diagram.jpg"
+
+
 def tplIngestCounts(dctConfig: dict, dfRaw: pd.DataFrame) -> tuple:
     """Repeat the ingest cleaning steps in memory and count the rows each one removes.
 
@@ -479,9 +487,306 @@ def subPrintGraphEvidence(dctConfig: dict) -> None:
         subPrintImage(pthFile)
 
 
+def subPrintModelScoreEvidence(dctConfig: dict) -> None:
+    """Print the scores the comparison answer quotes, with plain labels.
+
+    It reads the table compare.py wrote and prints, for each model, the AUC on
+    the test rows and the cross-validated AUC on the training rows with its
+    spread. Then it prints the gap between the two candidates next to the
+    spread, which is how the answer judges whether the gap is real.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses outputs.comparison_path
+            and comparison.cv_folds.
+
+    Returns:
+        None. It only prints. If the table does not exist it says so, and if there
+        are fewer than two candidates it skips the gap line.
+    """
+    pthTable = Path(dctConfig["outputs"]["comparison_path"])
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Model Evaluation and Benchmarking{STR_RESET}")
+    if not pthTable.is_file():
+        print(f"\nNo comparison table at {pthTable}. Run python -m src.compare first.")
+        return
+
+    dfTable = pd.read_csv(pthTable)
+    print(f"\n{STR_BOLD}Test AUC{STR_RESET} is the score on the held-out test rows.")
+    print(f"\n{STR_BOLD}Cross-validated AUC{STR_RESET} is the mean over {dctConfig['comparison']['cv_folds']} folds of the training rows, "
+          f"with the spread (standard deviation) between folds. Four decimals, because the gap is small.\n")
+    for _, serRow in dfTable.iterrows():
+        print(f"\n{STR_BOLD}{serRow['model']:<20}{STR_RESET} ({serRow['role']:<9})  test AUC {serRow['roc_auc']:.3f}   "
+              f"cross-validated AUC {serRow['cv_auc_mean']:.4f} (+/- {serRow['cv_auc_std']:.4f})")
+
+    dfCandidates = dfTable[dfTable["role"] == "candidate"]
+    if len(dfCandidates) >= 2:
+        lstRows = list(dfCandidates.sort_values("cv_auc_mean", ascending=False).itertuples(index=False))
+        fltGap = lstRows[0].cv_auc_mean - lstRows[1].cv_auc_mean
+        fltSpread = max(lstRows[0].cv_auc_std, lstRows[1].cv_auc_std)
+        strVerdict = "smaller than" if fltGap < fltSpread else "larger than"
+        print(f"\n{STR_BOLD}Gap between the top two candidates:{STR_RESET} {lstRows[0].model} {lstRows[0].cv_auc_mean:.4f} "
+              f"vs {lstRows[1].model} {lstRows[1].cv_auc_mean:.4f}, a gap of {fltGap:.4f}.")
+        print(f"\n{STR_BOLD}Largest fold spread:{STR_RESET} {fltSpread:.4f}. The gap is {strVerdict} the spread.")
+
+
+def subPrintSuitabilityEvidence(dctConfig: dict) -> None:
+    """Print the facts that show why the architecture suits this prediction task.
+
+    Reads the model card and the sign-off file and prints four things in one block:
+    how rare readmission is and how the model copes with that, how the test rows
+    are kept apart from training, whether the model beat the baseline by enough,
+    and whether a named person has signed it off. Everything else the answer
+    mentions (rows removed, validation checks, group scores) is printed in the
+    earlier sections of the same report.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses approval.model_card_path,
+            approval.signoff_path, features.test_size and features.stratify.
+
+    Returns:
+        None. It only prints. If there is no model card it says so.
+    """
+    pthCard = Path(dctConfig["approval"]["model_card_path"])
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Why this architecture suits the task{STR_RESET}")
+    if not pthCard.is_file():
+        print(f"\nNo model card at {pthCard}. Run python -m src.train first.")
+        return
+    dctSaved = json.loads(pthCard.read_text(encoding="utf-8"))
+    dctGate = dctSaved["gate"]
+    dctFeatures = dctConfig["features"]
+
+    print(f"\n{STR_BOLD}Rare outcome:{STR_RESET} {dctSaved['training_positive_rate']:.1%} of training patients were readmitted, "
+          f"so the model uses class_weight = {dctSaved['parameters'].get('class_weight')}.")
+    print(f"\n{STR_BOLD}Test rows kept apart:{STR_RESET} {dctSaved['training_rows']} training rows. "
+          f"{dctFeatures['test_size']:.0%} of the data is held back for testing "
+          f"(stratified: {dctFeatures['stratify']}). Cross-validation uses the training rows only.")
+    if dctGate["enabled"]:
+        print(f"\n{STR_BOLD}Gate:{STR_RESET} cross-validated AUC gain over the baseline {dctGate['auc_gain']:.3f}, "
+              f"required {dctGate['required_gain']:.3f}, {'PASSED' if dctGate['passed'] else 'FAILED'}.")
+
+    pthSignoff = pthSignoffFile(dctConfig)
+    if pthSignoff.is_file():
+        dctSignoff = json.loads(pthSignoff.read_text(encoding="utf-8"))
+        print(f"\n{STR_BOLD}Sign-off:{STR_RESET} {dctSignoff['decision']} by {dctSignoff['name']} ({dctSignoff['role']}) on {dctSignoff['date_utc']} UTC.")
+    else:
+        print(f"\n{STR_BOLD}Sign-off:{STR_RESET} none recorded yet. Run python -m src.approve.")
+
+
+def subPrintModelEvidence(dctConfig: dict) -> None:
+    """Print every model's test scores and settings in one block, for the baseline and candidate steps.
+
+    Scores come from the table compare.py wrote. Settings come from the comparison
+    section of config.yaml, so they match what was trained.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses outputs.comparison_path and
+            comparison.baseline, comparison.benchmarks and comparison.candidates.
+
+    Returns:
+        None. It only prints. If the table does not exist it says so.
+    """
+    pthTable = Path(dctConfig["outputs"]["comparison_path"])
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Models on the test rows{STR_RESET}")
+    if not pthTable.is_file():
+        print(f"\nNo comparison table at {pthTable}. Run python -m src.compare first.")
+        return
+
+    dfTable = pd.read_csv(pthTable).set_index("model")
+    dctComparison = dctConfig["comparison"]
+    dctSettings = {"baseline": dctComparison["baseline"]}
+    dctSettings.update(dctComparison["benchmarks"])
+    dctSettings.update(dctComparison["candidates"])
+
+    for strName, dctModel in dctSettings.items():
+        serRow = dfTable.loc[strName]
+        strOptions = ", ".join(f"{strKey} {varValue}" for strKey, varValue in dctModel.items() if strKey != "type")
+        print(f"\n{STR_BOLD}{strName}{STR_RESET} ({dctModel['type']})")
+        print(f"\nAUC {serRow['roc_auc']:.3f}   accuracy {serRow['accuracy']:.1%}   recall {serRow['recall']:.1%}")
+        print(f"\nsettings: {strOptions}")
+
+    # The dummy always predicts "not readmitted", so its accuracy is the share of patients who were not readmitted.
+    fltNotReadmitted = dfTable.loc["baseline", "accuracy"]
+    print(f"\n{STR_BOLD}Readmission rate in the test rows:{STR_RESET} {1 - fltNotReadmitted:.1%}, "
+          f"so always predicting \"not readmitted\" is right {fltNotReadmitted:.1%} of the time.")
+
+
+def subPrintScalingEvidence(dctConfig: dict) -> None:
+    """Print the logistic regression with and without scaling, to show scaling makes no real difference.
+
+    Both versions use the same split, settings and folds as the comparison. The
+    scaled version only adds a StandardScaler in front of the same model. Nothing
+    is saved, and the pipeline's real model is not changed.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses data.processed_path,
+            features, project.random_state, evaluation.positive_label,
+            comparison.cv_folds and comparison.candidates.logistic_regression.
+
+    Returns:
+        None. It only prints.
+    """
+    intSeed = dctConfig["project"]["random_state"]
+    varPositive = dctConfig["evaluation"]["positive_label"]
+    intFolds = dctConfig["comparison"]["cv_folds"]
+    dctSettings = dctConfig["comparison"]["candidates"]["logistic_regression"]
+
+    dfData = dfValidate(dfLoadCsv(dctConfig["data"]["processed_path"]), dctConfig)
+    dfX, serY = tplBuildFeatures(dfData, dctConfig)
+    dfXTrain, dfXTest, serYTrain, serYTest = lstSplitData(dfX, serY, dctConfig)
+    serActual = (serYTest == varPositive).astype(int)
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Does scaling change the logistic regression?{STR_RESET}")
+    dctAuc = {}
+    for strLabel, bScale in (("unscaled (used)", False), ("scaled", True)):
+        mdlModel = mdlBuildModel(dctSettings, intSeed)
+        if bScale:
+            mdlModel = make_pipeline(StandardScaler(), mdlModel)
+        fltCv = arrCrossValScores(mdlModel, dfXTrain, serYTrain, intFolds, intSeed).mean()
+        mdlModel.fit(dfXTrain, serYTrain)
+        arrProb = mdlModel.predict_proba(dfXTest)[:, list(mdlModel.classes_).index(varPositive)]
+        dctAuc[strLabel] = roc_auc_score(serActual, arrProb)
+        fltRecall = recall_score(serYTest, mdlModel.predict(dfXTest), pos_label=varPositive)
+        print(f"\n  {strLabel:<16} CV AUC {fltCv:.4f}   test AUC {dctAuc[strLabel]:.4f}   recall {fltRecall:.1%}")
+
+    fltDiff = abs(dctAuc["scaled"] - dctAuc["unscaled (used)"])
+    print(f"\n{STR_BOLD}Difference in test AUC:{STR_RESET} {fltDiff:.4f}")
+
+
+def subPrintScreeningEvidence(dctConfig: dict) -> None:
+    """Print the saved model as a screening tool: what it found, missed and flagged, against picking at random.
+
+    These are the numbers the interpretation answer quotes. The counts are built the
+    same way evaluate.py builds them, from the saved model and the test rows, so they
+    match the rest of the report.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses data.processed_path, model.path
+            and the features and evaluation settings.
+
+    Returns:
+        None. It only prints.
+    """
+    dfData = dfValidate(dfLoadCsv(dctConfig["data"]["processed_path"]), dctConfig)
+    dfX, serY = tplBuildFeatures(dfData, dctConfig)
+    dfXTrain, dfXTest, serYTrain, serYTest = lstSplitData(dfX, serY, dctConfig)
+
+    # The saved pipeline builds its own engineered columns, so it is given the raw test rows.
+    mdlSaved = mdlLoadModel(dctConfig["model"]["path"])
+    arrPredictions = mdlSaved.predict(dfRawInputs(dfData, dctConfig).loc[dfXTest.index])
+    dfCounts = dfConfusionCounts(serYTest, arrPredictions, dctConfig)
+
+    dctRow = dfCounts.iloc[0].to_dict()
+    intTp, intFn = int(dctRow["true_positive"]), int(dctRow["false_negative"])
+    intFp, intTn = int(dctRow["false_positive"]), int(dctRow["true_negative"])
+    intRows = intTp + intFn + intFp + intTn
+    intReadmitted = intTp + intFn
+    intFlagged = intTp + intFp
+    fltBaseRate = intReadmitted / intRows
+    fltHitRate = intTp / intFlagged
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Screening view of the saved model (test rows){STR_RESET}")
+    print(f"\n{STR_BOLD}Readmitted patients:{STR_RESET} {intReadmitted} of {intRows:,} ({fltBaseRate:.1%})")
+    print(f"\n{STR_BOLD}Found:{STR_RESET} {intTp} ({intTp / intReadmitted:.0%})   {STR_BOLD}Missed:{STR_RESET} {intFn} ({intFn / intReadmitted:.0%})")
+    print(f"\n{STR_BOLD}Flagged:{STR_RESET} {intFlagged}, of which {intTp} were readmitted, so the hit rate is {fltHitRate:.0%}")
+    print(f"\n{STR_BOLD}False alarms:{STR_RESET} {intFp}")
+    print(f"\n{STR_BOLD}Hit rate compared with picking at random:{STR_RESET} {fltHitRate:.1%} / {fltBaseRate:.1%} = {fltHitRate / fltBaseRate:.1f} times")
+
+
+def subPrintAucIntervalEvidence(dctConfig: dict, intResamples: int = 1000) -> None:
+    """Print how much the saved model's test AUC could move by chance, from resampling the test rows.
+
+    The test rows are drawn again with replacement, many times, and the AUC is
+    worked out each time. The middle 95% of those AUCs is the interval. It shows
+    the size of the uncertainty that comes from having only one test split. It
+    does not change the model or the reported AUC.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses data.processed_path, model.path,
+            project.random_state, evaluation.positive_label and the features settings.
+        intResamples: How many times to redraw the test rows.
+
+    Returns:
+        None. It only prints.
+    """
+    varPositive = dctConfig["evaluation"]["positive_label"]
+    dfData = dfValidate(dfLoadCsv(dctConfig["data"]["processed_path"]), dctConfig)
+    dfX, serY = tplBuildFeatures(dfData, dctConfig)
+    dfXTrain, dfXTest, serYTrain, serYTest = lstSplitData(dfX, serY, dctConfig)
+
+    # The saved pipeline builds its own engineered columns, so it is given the raw test rows.
+    mdlSaved = mdlLoadModel(dctConfig["model"]["path"])
+    dfRawTest = dfRawInputs(dfData, dctConfig).loc[dfXTest.index]
+    arrProb = mdlSaved.predict_proba(dfRawTest)[:, list(mdlSaved.classes_).index(varPositive)]
+    arrActual = (serYTest == varPositive).astype(int).values
+
+    objRandom = np.random.default_rng(dctConfig["project"]["random_state"])
+    lstAucs = []
+    for _ in range(intResamples):
+        arrPick = objRandom.integers(0, len(arrActual), len(arrActual))
+        lstAucs.append(roc_auc_score(arrActual[arrPick], arrProb[arrPick]))
+    fltLow, fltHigh = np.percentile(lstAucs, [2.5, 97.5])
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Uncertainty in the test AUC{STR_RESET}")
+    print(f"\n{STR_BOLD}Test AUC:{STR_RESET} {roc_auc_score(arrActual, arrProb):.3f} on {len(arrActual):,} test rows ({int(arrActual.sum())} readmitted)")
+    print(f"\n{STR_BOLD}95% interval from {intResamples:,} resamples of the test rows:{STR_RESET} {fltLow:.3f} to {fltHigh:.3f}")
+
+def subPrintFeatureSignalEvidence(dctConfig: dict) -> None:
+    """Print how much signal each model input carries on its own, using the training rows only.
+
+    For each column the AUC is worked out with that column as the score, and the
+    result is shown as distance from chance, so a column that works backwards is
+    not mistaken for a useless one. An AUC of 0.500 means no signal. The test rows
+    are not used, so nothing here peeks at the final check.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses data.processed_path,
+            evaluation.positive_label and the features settings.
+
+    Returns:
+        None. It only prints. The columns are listed strongest first.
+    """
+    varPositive = dctConfig["evaluation"]["positive_label"]
+    dfData = dfValidate(dfLoadCsv(dctConfig["data"]["processed_path"]), dctConfig)
+    dfX, serY = tplBuildFeatures(dfData, dctConfig)
+    dfXTrain, dfXTest, serYTrain, serYTest = lstSplitData(dfX, serY, dctConfig)
+    serActual = (serYTrain == varPositive).astype(int)
+
+    lstRows = []
+    for strColumn in dfXTrain.columns:
+        fltAuc = roc_auc_score(serActual, dfXTrain[strColumn])
+        lstRows.append((strColumn, fltAuc, abs(fltAuc - 0.5)))
+    lstRows.sort(key=lambda tplRow: tplRow[2], reverse=True)
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Signal in each input on its own (training rows){STR_RESET}")
+    print("AUC of the column used alone as the score. 0.500 means no signal. Below 0.500 means the column works the other way round.\n")
+    for strColumn, fltAuc, fltFromChance in lstRows:
+        print(f"\n  {strColumn:<16} {fltAuc:.3f}   ({fltFromChance:.3f} from chance)")
+
+
+
+
+
+
 # ---------------------------------------------------------------------------
 # One section for each stage, in pipeline order.
 # ---------------------------------------------------------------------------
+
+def subPrintDiagramEvidence() -> None:
+    """Print the pipeline architecture diagram as a picture in the RTF file.
+
+    The diagram is drawn in PowerPoint (artifacts/Pipeline_Architecture_Diagram.pptx)
+    and exported as a JPEG with the same name. This prints the JPEG. If you change
+    the slide, export it again, because the RTF shows the JPEG and not the slide.
+
+    Returns:
+        None. It only prints. If the JPEG is missing it says so.
+    """
+    pthDiagram = Path(STR_DIAGRAM_FILE)
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Pipeline architecture diagram{STR_RESET}")
+    if not pthDiagram.is_file():
+        print(f"No diagram at {pthDiagram}. Export the slide as a JPEG to that path.")
+        return
+    subPrintImage(pthDiagram)
+
 
 def subAnswerIngest(dctConfig: dict) -> None:
     """Print the ingest answers, each below its evidence.
@@ -882,78 +1187,93 @@ def subAnswerCompare(dctConfig: dict) -> None:
     # The table compare.py wrote, read back from disk.
     subPrintComparisonEvidence(dctConfig)
 
+    subPrintModelScoreEvidence(dctConfig)
+
     # The table above is the evidence. Say what the baseline and candidates show.
     # Prints this step, in bold italic, into the RTF file. Write your answer between
     # the quotes on the second line. Use triple quotes if it runs over several lines.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe model evaluation and benchmarking (the baseline and candidate comparison).",
-        "",
+        "The above script compares four different models on the same test data: a do-nothing model, an age 65 rule, a logistic regression, and a random forest model. To verify the differences between the models, I ran each model with 5-fold cross-validation on the training set. The results on the test set were 0.639 for the logistic regression, 0.636 for the random forest, 0.511 for the age 65 rule, and 0.500 for the do-nothing model. After running the two top-scoring models on cross-validation (0.606 for logistic regression and 0.599 for random forest), I couldn’t detect any meaningful differences between them. The folds had a variability of about 0.02. I chose the simpler model, logistic regression. The model scores are stored in model_comparison.csv, and the final recommendation is written to evidence.md.",
     )
 
-    # The whole pipeline has run by now. Describe the architecture diagram (the image goes in the README).
+    # The whole pipeline has run by now. The diagram is the evidence, then describe it.
+    subPrintDiagramEvidence()
     subPrintStep(
         "Step 1 - Create a pipeline architecture diagram showing: raw data and its source, data ingestion, data validation, feature engineering and preprocessing, model training, model evaluation and benchmarking, versioning and experiment or artefact tracking, model saving or approval, the reusable prediction workflow, and monitoring considerations.",
-        "",
+        "The pipeline starts with the raw data, a synthetic CSV of 10,000 patients, and runs through ingest.py, validate.py (11 checks) and features.py, then train.py, evaluate.py, compare.py and plots.py. Git versions the code, DVC tracks the stage graph, MLflow logs the train, evaluate and compare runs, and each stage writes an RTF report. The model is saved only if its cross-validated AUC beats the baseline by at least 0.05, and a named person has to approve it with approve.py before it can score anyone. predict.py and the FastAPI service run new patients through the same validation and feature code, and monitoring is shown as a dashed box because I’ve described it but not built it.",
     )
+
 
     # Tie the answer to this task: rare readmissions, a shared feature function, config-held exclusions.
+    subPrintSuitabilityEvidence(dctConfig)
     subPrintStep(
         "Step 1 - Explain why the proposed architecture is suitable for your prediction task rather than presenting a generic machine learning pipeline.",
-        "",
+        "The purpose of this pipeline is to answer one simple question for adult inpatients: Will they be readmitted within 30 days of discharge? Readmission occurs in only 14% of cases, so classes are imbalanced. As such, the model is evaluated on AUC and recall scores on the test data, computed separately by age and sex groups. The data needed cleaning, as ingest removed 320 rows (i.e. sex = “Other” or age < 18 or age > 100). The validation step here runs 11 checks before training up the model. The model is tested on a separate test data split. Note that wrong answers here can be very bad for patients, so we require the model to improve on the baseline by at least 0.05 AUC in cross-validation and then have a named person sign off on the model. Both the predict.py script and the corresponding FastAPI service scripts reuse the training code of this pipeline to process new inpatients exactly as the training data was.",
     )
 
+
     # The baseline row in the table above is a dummy classifier that always predicts the commoner outcome.
+    subPrintModelEvidence(dctConfig)
     subPrintStep(
         "Step 3 - Train a simple baseline model, such as a dummy classifier, dummy regressor, historical average, persistence model or existing-rule benchmark.",
-        "",
+        "In compare.py,  two baselines were added: 1) a dummy classifier that always predicts “not readmitted” (since that’s the most common outcome), and 2) an existing-rule benchmark that looks at age and flags anyone over 65. The dummy classifier has an AUC of 0.500 and finds none of the readmissions (recall 0%) yet its accuracy 86% of the time. This highlights that accuracy is not a good metric for this problem. The age rule has an AUC of 0.511 and a recall of 32%, meaning age tells us little, and any real model will need to do better than this.",
     )
 
     # The logistic regression and random forest rows in the table above are the candidates.
     subPrintStep(
         "Step 3 - Train at least one candidate machine learning model.",
-        "",
+        "Two models were trained using the same set of rows for training: a logistic regression model and a random forest model with 300 trees of maximum depth 6. The two models used balanced class weights since readmissions account for only 14% of all patients. The performance of the two models on the test data was very similar: the logistic regression achieved an AUC of 0.639 and found 62% of the readmissions, while the random forest had an AUC of 0.636 and found 61% of the readmissions. The age rule managed an AUC of 0.511 and 32% of readmissions. ",
     )
 
+
     # Every model was given the same engineered features and the same split, shown above.
+    subPrintScalingEvidence(dctConfig)
     subPrintStep(
         "Step 3 - Apply preprocessing consistently to the baseline and candidate models where appropriate.",
-        "",
+        "In features.py, the pulse pressure feature and an encoded sex feature have been added. compare.py and train.py only use the output of features.py, so they do no preprocessing. One function creates all four models. All models are trained and tested on the same rows of data. No information is learned from the data in this step, the step only applies fixed rules from config.yaml. If preprocessing is not needed it is not applied: the dummy ignores its inputs, the age rule only reads the age column and nothing is scaled because scaling the logistic regression changed its test AUC by only 0.0001."
     )
 
     # Read the baseline and candidate rows of the table above side by side.
     subPrintStep(
         "Step 3 - Compare the candidate model with the baseline.",
-        "",
+        "The logistic regression test AUC is 0.639 against 0.500, and it finds 62% of readmissions (159 of 258), where the baseline finds none. The baseline’s accuracy is higher, 86% against 65%, only because it never flags anyone and 86% of patients aren’t readmitted. The cost is false alarms: of 711 patients the logistic regression flagged, 552 (78%) were not readmitted (a precision of 22%), and its cross-validated gain of 0.106 AUC passes the 0.05 gate.",
     )
+
 
     # Say what the numbers mean for readmission prediction, not just what they are.
+    subPrintScreeningEvidence(dctConfig)
     subPrintStep(
         "Step 3 - Interpret the results rather than reporting metric values alone.",
-        "",
+        "This is a weak model, to be used as a screening tool only. It found 159 of the 258 readmitted cases for a miss rate of 99/258 or 38%. However, it raised 552 false alarms so that only about 1 in 5 of the flags raised actually corresponded to a readmitted patient. The hit rate was 22% or 1.6 times that of a random model which had a hit rate of 14%. The AUC for this model was 0.639, the random forest model scored 0.636, so the extra complexity buys nothing. This model is to be used as a means to decide which cases to refer to a clinician for further assessment.",
     )
 
+
     # Think about synthetic data, one split, the threshold and what AUC does not tell you.
+    subPrintAucIntervalEvidence(dctConfig)
     subPrintStep(
         "Step 3 - Discuss limitations of the evaluation, including what the results do and do not establish.",
-        "",
+        "These results show that the logistic regression finds some real signal on this data: it beats the baseline and the age rule, and the gap is bigger than the fold-to-fold noise. They do not show that it would work on real patients, because the data is synthetic. The test set is one split of 1,840 patients with 258 readmissions, so the AUC of 0.639 could easily be a few points either way (about 0.60 to 0.68 when I resampled the test rows). There was no date or site column, so I couldn’t test over time or across hospitals, and fairness was only checked by sex and age band, so the results say nothing about other groups, children, or whether flagging patients would actually reduce readmissions.",
     )
 
     # The table above is from one split of synthetic data. Say what it does and does not establish.
+    subPrintFeatureSignalEvidence(dctConfig)
     subPrintStep(
         "Step 6 - Discuss limitations in the data, features, model and evaluation (the model and the evaluation).",
-        "",
+        "The data is synthetic, so the scores say nothing about real patients, and with only ten patient measurements (age, sex, blood pressure, glucose and a few conditions) it leaves out the things that usually drive readmission, such as prior admissions, length of stay and diagnosis. The features are simple, and in testing age and glucose alone carried no signal. The model is a plain logistic regression that can only draw straight-line relationships, and the signal is weak: about three in four flagged patients are not readmitted. The evaluation uses a single 80/20 split, so the AUC of 0.639 could move a few points either way (roughly 0.60 to 0.68), and it cannot test over time or across hospitals because there is no date or site column, and fairness is checked by sex and age band only, with no ethnicity or Indigenous status data.",
     )
 
     # The README and Git guide hold the steps. Summarise them here.
+    subPrintVersionEvidence(dctConfig)
     subPrintStep(
         "Step 4 - Provide sufficient set-up and run instructions for another person to reproduce the result.",
-        "",
+        "The README has a “Reproduce the results from a fresh clone” section. In short: clone the repository, make a Python 3.12 virtual environment, run pip install -r requirements.txt, download the raw CSV from Kaggle into data/raw/, then run the tests and the stages in order (or dvc repro), with a named person running src.approve before src.predict will work. Every setting is in config.yaml, and the README lists the expected results, such as a test AUC of 0.639, so they can check their run.",
     )
 
     # Each stage is a python -m command, and dvc.yaml runs them all with dvc repro.
     subPrintStep(
         "Step 5 - Provide repeatable commands or scripts for running the main stages of the pipeline.",
-        "",
+        "There is a separate command for each main stage, which can be run in order from the project root. The commands are python -m src.ingest, validate, train, evaluate, compare and plots, then approve, predict and answers_evidence. The stages read results from files written by previous stages, all settings (including the random seed) are in config.yaml, and any command line option (such as --input) can be used to override the corresponding value in config.yaml for that single run. dvc repro runs all seven DVC stages in sequence (everything except approve and predict) and re-runs only those whose input files have changed; all of these commands are listed in the README in a table.",
     )
 
 
