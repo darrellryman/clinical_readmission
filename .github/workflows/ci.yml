@@ -11,13 +11,14 @@ on:
 jobs:
   test:
     # GitHub lends the job a fresh Ubuntu machine. Nothing carries over from your computer.
-    runs-on: ubuntu-latest
+    # The version is pinned, so a change to what ubuntu-latest points at cannot break the run.
+    runs-on: ubuntu-24.04
     steps:
       # Copies the repository onto that machine.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Installs Python. cache: pip keeps downloaded libraries between runs, so later runs are faster.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip

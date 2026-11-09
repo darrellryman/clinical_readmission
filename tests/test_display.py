@@ -130,7 +130,7 @@ def test_step_text_is_bold_and_italic_in_the_rtf_file(tmp_path, capsys):
     subPrintStep("Step 1 - Define the problem.", "An answer.")
     pthFile = pthSaveRtf(capsys.readouterr().out, tmp_path / "step.rtf")
     strRtf = pthFile.read_text()
-    assert "\\i Step 1 - Define the problem." in strRtf
+    assert "\\b \\i \\cf1 Step 1 - Define the problem." in strRtf
     assert "\\b \\i Answer:" in strRtf
     assert "\\b0\\i0" in strRtf
     assert "\x1b" not in strRtf
