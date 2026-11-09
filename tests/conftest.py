@@ -100,6 +100,11 @@ def dctConfig() -> dict:
             "group_metrics": ["recall", "precision"],
         },
         "service": {"host": "127.0.0.1", "port": 8000, "max_patients": 5},
+        "monitoring": {
+            "psi_watch": 0.1, "psi_alert": 0.25, "psi_bins": 5,
+            "bad_share_watch": 0.01, "bad_share_alert": 0.05,
+            "flag_rate_watch": 0.05, "flag_rate_alert": 0.10, "min_batch_rows": 10,
+        },
         "testing": {"rtf_path": "reports/test/{stage}_output.rtf"},
     }
 

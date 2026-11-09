@@ -334,6 +334,27 @@ outputs:
   # prediction drift apart.
   features_path: data/processed/features.csv
 
+# Drift and data-quality checks for a new batch of patients (monitor.py). Run by hand
+# with python -m src.monitor. Each check gives PASS, WATCH or ALERT.
+monitoring:
+  # Population stability index (PSI) of each input, batch against training. Below
+  # psi_watch is stable. From psi_watch it is a shift worth watching. From psi_alert
+  # it is a large shift. 0.1 and 0.25 are the usual rules of thumb.
+  psi_watch: 0.1
+  psi_alert: 0.25
+  # How many bins a numeric column is cut into, using the training data's quantiles.
+  psi_bins: 10
+  # The share of rows that are missing, outside the limits or in an unseen category.
+  bad_share_watch: 0.01
+  bad_share_alert: 0.05
+  # The change in the share of patients the model flags, batch against training, in
+  # percentage points as a fraction (0.05 is 5 points).
+  flag_rate_watch: 0.05
+  flag_rate_alert: 0.10
+  # A batch smaller than this is too small for stable drift numbers. The check still
+  # runs but says so.
+  min_batch_rows: 30
+
 # Settings used only when the tests run (pytest).
 testing:
   # The same idea as outputs.rtf_path, but for test runs. It is a different

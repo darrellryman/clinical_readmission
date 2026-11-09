@@ -27,6 +27,7 @@ Each stage is its own program. They pass results to each other through files.
 | Compare | `python -m src.compare` | Trains a baseline, a simple age rule and two candidate models on the same rows, writes one comparison table, and writes an evaluation evidence record |
 | Approve | `python -m src.approve --name ... --role ... --decision approved --reason ...` | A named person records a sign-off for the saved model. `predict` and `serve` refuse to use a model without one. See [Approval gate and model card](#approval-gate-and-model-card) |
 | Predict | `python -m src.predict` | Scores the new patients with the saved pipeline, and checks the predictions against their kept-apart answers |
+| Monitor | `python -m src.monitor` | Optional. Checks a batch of new patients against the training data for input drift, bad data and a change in how many patients the model flags. Gives PASS, WATCH or ALERT. See [Monitor a new batch](#monitor-a-new-batch) |
 | Plots | `python -m src.plots` | Optional. Draws four evidence graphs into `reports/figures/`: ROC and precision-recall curves, cross-validated AUC per fold, the error-count grid, and recall and precision by group. See [Graphs](#graphs) |
 | Answer evidence | `python -m src.answers_evidence` | Run it last. Prints every assessment answer with the evidence that supports it, in pipeline order, into one report. Reads the data, the saved model, the comparison table and MLflow. Trains and writes nothing |
 | Serve | `python -m src.serve` | Optional. Serves the saved model as a web API (FastAPI). See [Prediction service](#prediction-service) |
@@ -61,6 +62,7 @@ clinical_readmission/
     approve.py        records a named person's sign-off, and checks it before a model is used
     predict.py        scores new data
     serve.py          the prediction service (FastAPI), optional
+    monitor.py        drift and data-quality check for a new batch, optional
     answers_evidence.py   the assessment answers, each below its evidence
     check_setup.py    reports which packages and programs are installed
   tests/              pytest tests
@@ -154,7 +156,13 @@ python -m src.approve --name "Jane Smith" --role "Clinical owner" --decision app
 python -m src.predict
 ```
 
-**Step 11. Write the answers report.** This collects the evidence from every earlier step into one report.
+**Step 11. Check the new patients for drift.** This compares the new patients with the training data and reports PASS, WATCH or ALERT for input drift, bad data and a change in how many patients the model flags. The report is saved to `reports/monitor_output.rtf`. See [Monitor a new batch](#monitor-a-new-batch).
+
+```
+python -m src.monitor
+```
+
+**Step 12. Write the answers report.** This collects the evidence from every earlier step into one report.
 
 ```
 python -m src.answers_evidence
@@ -166,7 +174,7 @@ If Way A was used in step 8, run this instead. It forces the report to refresh n
 dvc repro --force answers_evidence
 ```
 
-**Step 12. Check the results.** Reports are written to the `reports` folder. Compare the run against the reference figures below.
+**Step 13. Check the results.** Reports are written to the `reports` folder. Compare the run against the reference figures below.
 
 The random seed and every setting live in `config.yaml`, and models run on one thread, so the same data, settings and library versions give the same numbers. You can check your run against these figures from the reference run:
 
@@ -180,9 +188,9 @@ The random seed and every setting live in `config.yaml`, and models run on one t
 
 Small differences in the third decimal can appear if library versions differ. `requirements.txt` sets minimum versions for most libraries and pins only the MLflow ones, so a newer scikit-learn may move a score slightly. Every output file is listed in [Output files](#output-files).
 
-**Step 13. Prediction Service** To serve predictions over a web API once the model is approved, see [Prediction service](#prediction-service).
+**Step 14. Prediction Service** To serve predictions over a web API once the model is approved, see [Prediction service](#prediction-service).
 
-**Step 14. Track Runs With MLflow** To browse the logged runs, metrics and models in the MLflow web page, see [Track runs with MLflow](#track-runs-with-mlflow).
+**Step 15. Track Runs With MLflow** To browse the logged runs, metrics and models in the MLflow web page, see [Track runs with MLflow](#track-runs-with-mlflow).
 
 ## Loading the raw data
 
@@ -224,6 +232,21 @@ Then run `python -m src.ingest`. Each attempt waits `data.download_timeout` seco
 Every option stops the run on an empty or header-only file. Each run prints the source type, the location, the time and a short fingerprint of the file at the top of `reports/ingest_output.rtf`. The same bytes always give the same fingerprint, so two runs can be compared, and a Kaggle download matches the same file downloaded by hand.
 
 The Kaggle page doesn't state a licence or a file layout, so check the page's terms before reusing the data. If the file's columns differ from `data.keep_columns` in `config.yaml`, ingest and validate stop with a message naming what's missing.
+
+## Monitor a new batch
+
+`python -m src.monitor` checks a batch of new patients before anyone trusts the predictions. It is run by hand, like predict, and is not a DVC stage. It compares the batch with the cleaned training data and reports PASS, WATCH or ALERT for three things:
+
+- **Input drift.** The population stability index (PSI) of each input column. Below 0.1 is stable, 0.1 to 0.25 is worth watching, above 0.25 is a large shift.
+- **Data quality.** The share of values that are missing, outside the limits in `validation.column_ranges` and the age filter, or in a category the model has never seen.
+- **Output drift.** The share of patients the model flags, compared with the share it flags in the training data.
+
+```
+python -m src.monitor
+python -m src.monitor --input your_file.csv
+```
+
+It checks `data/new/new_synthetic_clinical_dataset.csv` unless `--input` is given. The report is saved to `reports/monitor_output.rtf`, and the exit code is 1 when any check is an ALERT, so a scheduler or CI job can act on it. The thresholds are in the `monitoring` section of `config.yaml`. The new-patients file is a random sample of the same data, so it should PASS. A batch with older patients or missing values should not. Recall can't be monitored until real outcomes arrive, so it isn't part of this check.
 
 ## Configure
 
@@ -368,7 +391,7 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 | compare | `model_comparison.csv` | `reports/` | One row per model (baseline, age rule, logistic regression, random forest): role, type, cross-validated AUC mean and spread, and the test scores. |
 | compare | `evaluation_evidence.md` | `reports/` | One-page evidence record: intended use, not-for list, results table, recommended model, limits and recommendation. |
 | predict | `predictions.csv` | `reports/` | The new patients' columns plus a prediction column (the model's 0 or 1 for each patient). |
-| ingest, validate, train, evaluate, compare, plots, predict | `{stage}_output.rtf (7 files, for example train_output.rtf)` | `reports/` | Everything each stage prints, saved as a Rich Text file instead of shown on screen. Each run overwrites its own file. |
+| ingest, validate, train, evaluate, compare, plots, predict, monitor | `{stage}_output.rtf (8 files, for example train_output.rtf)` | `reports/` | Everything each stage prints, saved as a Rich Text file instead of shown on screen. Each run overwrites its own file. |
 | answers_evidence | `answer_evidence_output.rtf` | `reports/` | Every assessment answer in bold italic, each below the evidence that supports it, in pipeline order. Each run overwrites it. |
 | **Graphs** | | | |
 | plots | `1_roc_pr.png` | `reports/figures/` | ROC and precision-recall curves for each model. |
@@ -388,7 +411,7 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 python -m pytest tests
 ```
 
-212 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
+229 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
 
 ## Track runs with MLflow
 

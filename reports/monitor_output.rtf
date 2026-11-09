@@ -1,0 +1,85 @@
+{\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}\f0\fs18
+\b Monitor output:\b0\i0\ulnone  2026-11-09 17:02:25\par
+\par
+\par
+\b ###################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b Assessment 2: Applied MLOps pipeline project\b0\i0\ulnone \par
+\par
+\par
+\par
+\b Name:\b0\i0\ulnone  Darrell Ryman\par
+\par
+\b Student ID:\b0\i0\ulnone  S00445230\par
+\par
+\b Course:\b0\i0\ulnone  AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS\par
+\par
+\par
+\par
+\b Pipeline Stage:\b0\i0\ulnone  Monitor\par
+\par
+\par
+\par
+\b Client question:\b0\i0\ulnone  At the point of discharge, will an adult inpatient be readmitted within 30 days?\par
+\par
+\b Response variable:\b0\i0\ulnone  readmission_30d\par
+\par
+\b Predictors:\b0\i0\ulnone  age, sex, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension\par
+\par
+\b Data source:\b0\i0\ulnone  data/new/new_synthetic_clinical_dataset.csv\par
+\par
+\par
+\par
+\b ##################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b \ul Batch\b0\i0\ulnone \par
+484 new rows from data/new/new_synthetic_clinical_dataset.csv, checked against 9196 training rows.\par
+\par
+\b \ul 1. Input drift (PSI, batch against training)\b0\i0\ulnone \par
+WATCH from 0.1, ALERT from 0.25.\par
+\par
+      column    psi result\par
+         age 0.0122   PASS\par
+         sex 0.0012   PASS\par
+         bmi 0.0117   PASS\par
+ systolic_bp 0.0226   PASS\par
+diastolic_bp 0.0103   PASS\par
+     glucose 0.0197   PASS\par
+ cholesterol 0.0273   PASS\par
+  creatinine 0.0123   PASS\par
+    diabetes 0.0000   PASS\par
+hypertension 0.0000   PASS\par
+\par
+\b \ul 2. Data quality\b0\i0\ulnone \par
+WATCH from 1% of rows, ALERT from 5%.\par
+\par
+      column           check  count  share result\par
+         age         missing      0    0.0   PASS\par
+         sex         missing      0    0.0   PASS\par
+         bmi         missing      0    0.0   PASS\par
+ systolic_bp         missing      0    0.0   PASS\par
+diastolic_bp         missing      0    0.0   PASS\par
+     glucose         missing      0    0.0   PASS\par
+ cholesterol         missing      0    0.0   PASS\par
+  creatinine         missing      0    0.0   PASS\par
+    diabetes         missing      0    0.0   PASS\par
+hypertension         missing      0    0.0   PASS\par
+         bmi  outside limits      0    0.0   PASS\par
+ systolic_bp  outside limits      0    0.0   PASS\par
+diastolic_bp  outside limits      0    0.0   PASS\par
+     glucose  outside limits      0    0.0   PASS\par
+ cholesterol  outside limits      0    0.0   PASS\par
+  creatinine  outside limits      0    0.0   PASS\par
+         age  outside limits      0    0.0   PASS\par
+         sex unseen category      0    0.0   PASS\par
+\par
+\b \ul 3. Output drift (share of patients flagged)\b0\i0\ulnone \par
+Training data: 38.8% flagged. Batch: 38.8% flagged (484 rows scored). Change: 0.0 percentage points. WATCH from 5%, ALERT from 10%.\par
+Result: PASS\par
+\par
+\b \ul Overall\b0\i0\ulnone \par
+\b PASS\b0\i0\ulnone . Input drift: PASS. Data quality: PASS. Output drift: PASS.\par
+Recall can only be checked once the real outcomes arrive, so it is not part of this check.\par
+}

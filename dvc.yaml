@@ -6,7 +6,7 @@
 # itself is committed to Git, so a clone from GitHub has the data, model and reports
 # without a DVC remote.
 #
-# approve, predict and serve are not here. They need a person or a new-patients file.
+# approve, predict, serve and monitor are not here. They need a person or a new-patients file.
 #
 # answers_evidence reads the files the other stages write, so it runs last. It also
 # reads mlflow.db and the Git history, which DVC does not track. If only those

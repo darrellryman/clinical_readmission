@@ -79,6 +79,10 @@ DCT_REQUIRED_KEYS = {
     "plots": ["enabled", "folder", "dpi", "palette", "group_metrics"],
     "service": ["host", "port", "max_patients"],
     "tracking": ["enabled", "uri", "experiment_name"],
+    "monitoring": [
+        "psi_watch", "psi_alert", "psi_bins", "bad_share_watch", "bad_share_alert",
+        "flag_rate_watch", "flag_rate_alert", "min_batch_rows",
+    ],
     "testing": ["rtf_path"],
 }
 
@@ -227,6 +231,22 @@ def subCheckConfig(dctConfig) -> None:
             if (varMin is not None or varMax is not None) \
                     and dctData.get("value_column") not in (dctData.get("keep_columns") or []):
                 lstProblems.append("'data.value_column' must be one of data.keep_columns when min_value or max_value is set")
+
+    # Monitoring thresholds. Each watch level must be a number and no higher than its alert level.
+    dctMonitoring = dctConfig.get("monitoring")
+    if isinstance(dctMonitoring, dict):
+        for strWatch, strAlert in (("psi_watch", "psi_alert"), ("bad_share_watch", "bad_share_alert"),
+                                   ("flag_rate_watch", "flag_rate_alert")):
+            varWatch, varAlert = dctMonitoring.get(strWatch), dctMonitoring.get(strAlert)
+            if any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in (varWatch, varAlert)):
+                if varWatch is not None and varAlert is not None:
+                    lstProblems.append(f"'monitoring.{strWatch}' and 'monitoring.{strAlert}' must be numbers of 0 or more")
+            elif varWatch > varAlert:
+                lstProblems.append(f"'monitoring.{strWatch}' can't be above 'monitoring.{strAlert}'")
+        for strKey in ("psi_bins", "min_batch_rows"):
+            varValue = dctMonitoring.get(strKey)
+            if varValue is not None and (isinstance(varValue, bool) or not isinstance(varValue, int) or varValue < 1):
+                lstProblems.append(f"'monitoring.{strKey}' must be a whole number of at least 1")
 
     if lstProblems:
         raise ConfigError("; ".join(lstProblems))

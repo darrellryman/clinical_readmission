@@ -1,6 +1,6 @@
 {
   "model_type": "logistic_regression",
-  "created_utc": "2026-11-09 05:48:23",
+  "created_utc": "2026-11-09 06:32:18",
   "parameters": {
     "max_iter": 1000,
     "C": 1.0,
@@ -35,10 +35,10 @@
   "training_rows": 7356,
   "training_positive_rate": 0.1404,
   "random_state": 42,
-  "model_fingerprint": "80d004cb6100",
+  "model_fingerprint": "87212eac3eb0",
   "data_fingerprint": "72360c885da0",
-  "config_fingerprint": "1f0f8b6c553f",
-  "git_commit": "e1e17a8-dirty",
+  "config_fingerprint": "c1854aae15e4",
+  "git_commit": "86086de-dirty",
   "gate": {
     "enabled": true,
     "baseline_cv_auc": 0.5,

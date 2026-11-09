@@ -1088,7 +1088,7 @@ def subAnswerTrain(dctConfig: dict, strInputPath: str) -> None:
     # The model file above is an artefact. Say how it and the data are versioned (dvc.yaml).
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe versioning and experiment or artefact tracking.",
-        "Git versions the code, config.yaml, dvc.yaml and requirements.txt. DVC versions the raw data using a small pointer file and tracks the outputs of each stage (model, model card, metrics and reports) by storing their hashes in dvc.lock. MLflow tracks the runs for training, evaluation and comparison with relevant parameters, scores and saved files. Every run is tagged with the Git commit and fingerprints of the data and config. The model card carries the same fingerprints, so a team member can see what was used to build a given model.",
+        "Git versions the code, config.yaml, dvc.yaml, requirements.txt and the raw data, model, metrics and reports. DVC runs the stage graph and records a hash of every input and output in dvc.lock. MLflow tracks the training, evaluation and comparison runs, each tagged with the Git commit and fingerprints of the data and config, and the model card carries the same fingerprints.",
     )
 
     print(f"\n{STR_BOLD}Required gain:{STR_RESET} {dctConfig['approval']['min_auc_gain']:.3f}")
@@ -1128,7 +1128,7 @@ def subAnswerTrain(dctConfig: dict, strInputPath: str) -> None:
     # The model file above came from the data, code and config at this commit. Explain how to trace it (dvc.lock, Git commit).
     subPrintStep(
         "Step 4 - Explain how another team member could identify which data, code, configuration and evidence produced the selected model.",
-        "The model card saved beside the model records the Git commit, the random seed, and fingerprints of the model, the data and config.yaml. The commit provides the same code and config from Git, and dvc.lock, with the raw data’s pointer file, lets DVC restore the matching data. The same commit and fingerprints are tagged on the MLflow run, which also holds the parameters and scores. As long as the restored files match the fingerprints on the card, the team member will have the same model, data and configuration.",
+        "The model card records the Git commit, the random seed, and fingerprints of the model, the data and config.yaml. Checking out that commit restores the same code, config, data and model, and dvc.lock holds the hashes to verify them. The same commit and fingerprints are tagged on the MLflow run, so matching fingerprints mean the same model, data and configuration.",
     )
 
     # The model file saved above is reused by evaluate.py and predict.py. Say what it contains and what it does not.
@@ -1262,7 +1262,7 @@ def subAnswerCompare(dctConfig: dict) -> None:
     subPrintDiagramEvidence()
     subPrintStep(
         "Step 1 - Create a pipeline architecture diagram showing: raw data and its source, data ingestion, data validation, feature engineering and preprocessing, model training, model evaluation and benchmarking, versioning and experiment or artefact tracking, model saving or approval, the reusable prediction workflow, and monitoring considerations.",
-        "The pipeline starts with the raw data, a synthetic CSV of 10,000 patients, and runs through ingest.py, validate.py (11 checks) and features.py, then train.py, evaluate.py, compare.py and plots.py. Git versions the code, DVC tracks the stage graph, MLflow logs the train, evaluate and compare runs, and each stage writes an RTF report. The model is saved only if its cross-validated AUC beats the baseline by at least 0.05, and a named person has to approve it with approve.py before it can score anyone. predict.py and the FastAPI service run new patients through the same validation and feature code, and monitoring is shown as a dashed box, which is described but not built.",
+        "The pipeline starts with the raw data, a synthetic CSV of 10,000 patients, and runs through ingest.py, validate.py (11 checks) and features.py, then train.py, evaluate.py, compare.py and plots.py. Git versions the code, DVC tracks the stage graph, MLflow logs the train, evaluate and compare runs, and each stage writes an RTF report. The model is saved only if its cross-validated AUC beats the baseline by at least 0.05, and a named person has to approve it with approve.py before it can score anyone. predict.py and the FastAPI service run new patients through the same validation and feature code, and monitor.py checks a new batch for input drift, data quality and the share flagged.",
     )
 
 
@@ -1334,7 +1334,7 @@ def subAnswerCompare(dctConfig: dict) -> None:
     # Each stage is a python -m command, and dvc.yaml runs them all with dvc repro.
     subPrintStep(
         "Step 5 - Provide repeatable commands or scripts for running the main stages of the pipeline.",
-        "There is a separate command for each main stage, which can be run in order from the project root. The commands are python -m src.ingest, validate, train, evaluate, compare and plots, then approve, predict and answers_evidence. The stages read results from files written by previous stages, all settings (including the random seed) are in config.yaml, and any command line option (such as --input) can be used to override the corresponding value in config.yaml for that single run. dvc repro runs all seven DVC stages in sequence (everything except approve and predict) and re-runs only those whose input files have changed; all of these commands are listed in the README in a table.",
+        "There is a separate command for each main stage, which can be run in order from the project root. The commands are python -m src.ingest, validate, train, evaluate, compare and plots, then approve, predict, monitor and answers_evidence. The stages read results from files written by previous stages, all settings (including the random seed) are in config.yaml, and any command line option (such as --input) can be used to override the corresponding value in config.yaml for that single run. dvc repro runs all seven DVC stages in sequence (everything except approve, predict, serve and monitor) and re-runs only those whose input files have changed; all of these commands are listed in the README in a table.",
     )
 
 
@@ -1367,7 +1367,7 @@ def subAnswerPredict(dctConfig: dict) -> None:
     # What would you watch once this runs for real: input drift, the readmission rate, recall over time.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe monitoring considerations.",
-        "Monitoring covers the pipeline and the model file. It doesn’t cover live performance yet. All runs of train, evaluate and compare are logged to MLflow using data and config fingerprints, and Git commit ID. A change in results is traced to what changed. The validation procedure runs 11 checks on the data before training is performed. The serve.py file has health and information endpoints. The information endpoint returns the model card. The sign-off check ensures that only approved models that have not changed since sign-off are run. Drift monitoring or tracking of real readmission outcomes against predictions is not built yet. Those would be the next addition. The plan is to compare the patients flagged each month with the actual readmitted cases. The model is retrained and reapproved if recall falls noticeably.",
+        "Monitoring covers the pipeline and the model file. It doesn’t cover live performance yet. All runs of train, evaluate and compare are logged to MLflow using data and config fingerprints, and Git commit ID. A change in results is traced to what changed. The validation procedure runs 11 checks on the data before training is performed. The serve.py file has health and information endpoints. The information endpoint returns the model card. The sign-off check ensures that only approved models that have not changed since sign-off are run. monitor.py is a first drift check, run by hand on a new batch, and it reports PASS, WATCH or ALERT for input drift, data quality and the share flagged. Tracking real readmission outcomes against predictions is not built yet.",
     )
 
     # Think about input drift, the readmission rate, recall over time and how often validation fails.
@@ -1399,7 +1399,7 @@ def subAnswerPredict(dctConfig: dict) -> None:
     # The predictions above came from one batch. Say what you would check on each new batch before trusting it.
     subPrintStep(
         "Step 6 - Identify operational risks, such as missing inputs, model or data drift, and predictions outside expected ranges.",
-        "The model does not know how to handle missing inputs, so it stops with an error. The service also refuses to process incomplete patients, so a data feed that started to send blanks would stop scoring. While it's possible to enter completely implausible but fully complete data for a patient (e.g., a 400-year-old patient), it will return a score even though the input sits outside the range seen in training, and there’s currently no code to detect this. Data and model drift are not currently monitored in any way, so a drop in recall could go unnoticed until real outcomes are compared with predictions.",
+        "The model does not know how to handle missing inputs, so it stops with an error. The service also refuses to process incomplete patients, so a data feed that started to send blanks would stop scoring. A complete but implausible record (e.g., a 400-year-old patient) still gets a score from predict and the service, but monitor.py flags values outside the validation ranges when run on a batch. Drift is only checked when monitor.py is run by hand, so a drop in recall could go unnoticed until real outcomes are compared with predictions.",
     )
 
 
