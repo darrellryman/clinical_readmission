@@ -1,5 +1,5 @@
 {\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}\f0\fs18
-\b Answer_Evidence output:\b0\i0\ulnone  2026-11-09 17:36:48\par
+\b Answer_Evidence output:\b0\i0\ulnone  2026-11-09 17:41:01\par
 \par
 \par
 \b ###################################################################################\b0\i0\ulnone \par
@@ -357,6 +357,7 @@ Rows removed outside of minimum value (18), maximum value (100): 204\par
 \par
 \par
 \b \ul Git history\b0\i0\ulnone \par
+0aad170  2026-11-09  Full refresh of data, model and reports\par
 f050d2f  2026-11-09  Full refresh of data, model and reports\par
 6527784  2026-11-09  Full refresh of data, model and reports\par
 86086de  2026-11-09  Full refresh of data, model and reports\par
@@ -391,11 +392,11 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \i Step 4 - Use Git throughout the project and make meaningful commits that reflect the development of the pipeline.\b0\i0\ulnone \par
 \par
-\b \i Answer:\b0\i0\ulnone  \i Git was used to commit the pipeline in the order it runs, and the history is pushed to a private GitHub repository. Five commits build out the stages of the pipeline in sequence, ending with the tests and CI workflow. Four more initialise DVC, track the raw data with a pointer file, and record the first run by committing dvc.lock. The commit message for each one sums up what was added.\b0\i0\ulnone \par
+\b \i Answer:\b0\i0\ulnone  \i Git was used to commit the pipeline in the order it runs, and the history is pushed to a private GitHub repository. Five commits build out the stages of the pipeline in sequence, ending with the tests and CI workflow. Further commits initialise DVC, record the first run and move the data, model and reports into Git. The commit message for each one sums up what was added.\b0\i0\ulnone \par
 \par
 \par
 \b \ul Tracking evidence\b0\i0\ulnone \par
-\b Git commit:\b0\i0\ulnone  f050d2f\par
+\b Git commit:\b0\i0\ulnone  0aad170-dirty\par
 \b config.yaml fingerprint:\b0\i0\ulnone  c1854aae15e4\par
 \b Python:\b0\i0\ulnone  3.12.10\par
 \par
@@ -439,7 +440,7 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \i Step 4 - Explain how another team member could identify which data, code, configuration and evidence produced the selected model.\b0\i0\ulnone \par
 \par
-\b \i Answer:\b0\i0\ulnone  \i The model card records the Git commit, the random seed, and fingerprints of the model, the data and config.yaml. Checking out that commit restores the same code, config, data and model, and dvc.lock holds the hashes to verify them. The same commit and fingerprints are tagged on the MLflow run, so matching fingerprints mean the same model, data and configuration.\b0\i0\ulnone \par
+\b \i Answer:\b0\i0\ulnone  \i The model card records the Git commit it was trained from, the random seed, and fingerprints of the model, the data and config.yaml. Checking out the commit that stores the model restores the same code, config, data and model, and dvc.lock holds the hashes to verify them. The same commit and fingerprints are tagged on the MLflow run, so matching fingerprints mean the same model, data and configuration.\b0\i0\ulnone \par
 \par
 \par
 \i Step 5 - Save the trained preprocessing and modelling pipeline in a form that can be reused.\b0\i0\ulnone \par
@@ -870,7 +871,7 @@ AUC of the column used alone as the score. 0.500 means no signal. Below 0.500 me
 \par
 \par
 \b \ul Tracking evidence\b0\i0\ulnone \par
-\b Git commit:\b0\i0\ulnone  f050d2f\par
+\b Git commit:\b0\i0\ulnone  0aad170-dirty\par
 \b config.yaml fingerprint:\b0\i0\ulnone  c1854aae15e4\par
 \b Python:\b0\i0\ulnone  3.12.10\par
 \par

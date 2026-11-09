@@ -1111,7 +1111,7 @@ def subAnswerTrain(dctConfig: dict, strInputPath: str) -> None:
     # No code produces this evidence. It lives in the Git history, so describe your commits here.
     subPrintStep(
         "Step 4 - Use Git throughout the project and make meaningful commits that reflect the development of the pipeline.",
-        "Git was used to commit the pipeline in the order it runs, and the history is pushed to a private GitHub repository. Five commits build out the stages of the pipeline in sequence, ending with the tests and CI workflow. Four more initialise DVC, track the raw data with a pointer file, and record the first run by committing dvc.lock. The commit message for each one sums up what was added.",
+        "Git was used to commit the pipeline in the order it runs, and the history is pushed to a private GitHub repository. Five commits build out the stages of the pipeline in sequence, ending with the tests and CI workflow. Further commits initialise DVC, record the first run and move the data, model and reports into Git. The commit message for each one sums up what was added.",
     )
 
     # print the tracking evidence
