@@ -1328,7 +1328,7 @@ def subAnswerCompare(dctConfig: dict) -> None:
     subPrintVersionEvidence()
     subPrintStep(
         "Step 4 - Provide sufficient set-up and run instructions for another person to reproduce the result.",
-        "The README has a “Reproduce the results from a fresh clone” section. In short: clone the repository, make a Python 3.12 virtual environment, run pip install -r requirements.txt, run the tests, then run the stages in order (or python -m src.ingest followed by dvc repro), where ingest downloads the raw CSV from Kaggle, with a named person running src.approve before src.predict will work. Every setting is in config.yaml, and the README lists the expected results, such as a test AUC of 0.639, so they can check their run.",
+        "The README has a “Reproduce the results from a fresh clone” section. In short: clone the repository, make a Python 3.12 virtual environment, run pip install -r requirements.txt, run the tests, then run the stages in order (or dvc repro --force), where ingest downloads the raw CSV from Kaggle, with a named person running src.approve before src.predict will work. Every setting is in config.yaml, and the README lists the expected results, such as a test AUC of 0.639, so they can check their run.",
     )
 
     # Each stage is a python -m command, and dvc.yaml runs them all with dvc repro.

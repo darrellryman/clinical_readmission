@@ -1,0 +1,157 @@
+{\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}\f0\fs18
+\b Validate output:\b0\i0\ulnone  2026-11-09 16:48:21\par
+\par
+\par
+\b ###################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b Assessment 2: Applied MLOps pipeline project\b0\i0\ulnone \par
+\par
+\par
+\par
+\b Name:\b0\i0\ulnone  Darrell Ryman\par
+\par
+\b Student ID:\b0\i0\ulnone  S00445230\par
+\par
+\b Course:\b0\i0\ulnone  AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS\par
+\par
+\par
+\par
+\b Pipeline Stage:\b0\i0\ulnone  Validate\par
+\par
+\par
+\par
+\b Client question:\b0\i0\ulnone  At the point of discharge, will an adult inpatient be readmitted within 30 days?\par
+\par
+\b Response variable:\b0\i0\ulnone  readmission_30d\par
+\par
+\b Predictors:\b0\i0\ulnone  age, sex, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension\par
+\par
+\b Data source:\b0\i0\ulnone  data/processed/clean_synthetic_clinical_dataset.csv\par
+\par
+\par
+\par
+\b ##################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b \ul Data description\b0\i0\ulnone \par
+\b Rows:\b0\i0\ulnone  9196\par
+\b Columns:\b0\i0\ulnone  12\par
+\b Cells:\b0\i0\ulnone  110352\par
+\par
+\b \ul Total number for each data type:\b0\i0\ulnone \par
+float64    6\par
+int64      4\par
+str        2\par
+Name: count, dtype: int64\par
+\par
+\b \ul The column headers:\b0\i0\ulnone \par
+Index(['age', 'sex', 'bmi', 'systolic_bp', 'diastolic_bp', 'glucose',\par
+       'cholesterol', 'creatinine', 'diabetes', 'hypertension', 'diagnosis',\par
+       'readmission_30d'],\par
+      dtype='str')\par
+\par
+\b \ul Missing values summary\b0\i0\ulnone \par
+\par
+\b Total missing values in the whole dataset :\b0\i0\ulnone  0\par
+\b Percentage total missing values:\b0\i0\ulnone 0.0%\par
+\b % of rows with at least one missing value:\b0\i0\ulnone  0.0%\par
+\b % of columns with at least one missing value:\b0\i0\ulnone  0.0%\par
+\par
+\b \ul Number and % of missing values per column\b0\i0\ulnone \par
+                 Missing Count  Missing %\par
+age                          0        0.0\par
+sex                          0        0.0\par
+bmi                          0        0.0\par
+systolic_bp                  0        0.0\par
+diastolic_bp                 0        0.0\par
+glucose                      0        0.0\par
+cholesterol                  0        0.0\par
+creatinine                   0        0.0\par
+diabetes                     0        0.0\par
+hypertension                 0        0.0\par
+diagnosis                    0        0.0\par
+readmission_30d              0        0.0\par
+\par
+\b \ul Number and % of negative values per numeric column\b0\i0\ulnone \par
+                 Negative Count  Negative %\par
+age                           0         0.0\par
+bmi                           0         0.0\par
+systolic_bp                   0         0.0\par
+diastolic_bp                  0         0.0\par
+glucose                       0         0.0\par
+cholesterol                   0         0.0\par
+creatinine                    0         0.0\par
+diabetes                      0         0.0\par
+hypertension                  0         0.0\par
+readmission_30d               0         0.0\par
+\par
+\b \ul Duplicate Rows\b0\i0\ulnone \par
+\b Number of duplicated Rows:\b0\i0\ulnone  0\par
+Empty DataFrame\par
+Columns: [age, sex, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension, diagnosis, readmission_30d]\par
+Index: []\par
+\par
+\b \ul Count, mean, std, min, max, quartiles for numeric columns:\b0\i0\ulnone \par
+           age      bmi  systolic_bp  ...  diabetes  hypertension  readmission_30d\par
+count  9196.00  9196.00      9196.00  ...   9196.00       9196.00          9196.00\par
+mean     55.22    27.01       124.91  ...      0.12          0.30             0.14\par
+std      16.67     5.83        17.66  ...      0.32          0.46             0.35\par
+min      18.00    15.00        90.00  ...      0.00          0.00             0.00\par
+25%      43.00    22.80       112.00  ...      0.00          0.00             0.00\par
+50%      55.00    27.00       125.00  ...      0.00          0.00             0.00\par
+75%      67.00    31.00       137.00  ...      0.00          1.00             0.00\par
+max      90.00    50.00       180.00  ...      1.00          1.00             1.00\par
+\par
+[8 rows x 10 columns]\par
+\par
+\b \ul Dataset information\b0\i0\ulnone \par
+<class 'pandas.DataFrame'>\par
+RangeIndex: 9196 entries, 0 to 9195\par
+Data columns (total 12 columns):\par
+ #   Column           Non-Null Count  Dtype  \par
+---  ------           --------------  -----  \par
+ 0   age              9196 non-null   int64  \par
+ 1   sex              9196 non-null   str    \par
+ 2   bmi              9196 non-null   float64\par
+ 3   systolic_bp      9196 non-null   float64\par
+ 4   diastolic_bp     9196 non-null   float64\par
+ 5   glucose          9196 non-null   float64\par
+ 6   cholesterol      9196 non-null   float64\par
+ 7   creatinine       9196 non-null   float64\par
+ 8   diabetes         9196 non-null   int64  \par
+ 9   hypertension     9196 non-null   int64  \par
+ 10  diagnosis        9196 non-null   str    \par
+ 11  readmission_30d  9196 non-null   int64  \par
+dtypes: float64(6), int64(4), str(2)\par
+memory usage: 862.3 KB\par
+\par
+\b \ul The first 5 rows as a sanity check:\b0\i0\ulnone \par
+   age     sex   bmi  systolic_bp  ...  diabetes  hypertension      diagnosis  readmission_30d\par
+0   56  Female  36.4        148.0  ...         0             0  Heart Failure                0\par
+1   62    Male  27.5        129.0  ...         0             1      Pneumonia                0\par
+2   72  Female  32.4        106.0  ...         0             0  Heart Failure                0\par
+3   79  Female  17.9        101.0  ...         0             0         Normal                0\par
+4   70    Male  22.7        121.0  ...         0             1  Heart Failure                0\par
+\par
+[5 rows x 12 columns]\par
+\par
+\b \ul Validation checks\b0\i0\ulnone \par
+\b Check 1 - Table has rows:\b0\i0\ulnone  PASS (9196 rows)\par
+\b Check 2 - Required columns present:\b0\i0\ulnone  PASS (11 columns found)\par
+\b Check 3 - Minimum rows:\b0\i0\ulnone  PASS (9196 rows, minimum 10)\par
+\b Check 4 - No missing values in required columns:\b0\i0\ulnone  PASS (11 columns checked)\par
+\b Check 5 - Allowed values in sex:\b0\i0\ulnone  PASS (0 values outside ['Female', 'Male'])\par
+\b Check 6 - age in range:\b0\i0\ulnone  PASS (range 18 to 100)\par
+\b Check 7 - No duplicate rows:\b0\i0\ulnone  PASS (0 duplicate rows)\par
+\b Check 8 - readmission_30d is 0 or 1:\b0\i0\ulnone  PASS (0 other values)\par
+\b Check 9 - No unexpected columns:\b0\i0\ulnone  PASS (12 columns, all expected)\par
+\b Check 10 - Numeric columns hold numbers:\b0\i0\ulnone  PASS (9 columns checked)\par
+\b Check 11 - bmi in range:\b0\i0\ulnone  PASS (range 10 to 70)\par
+\b Check 11 - systolic_bp in range:\b0\i0\ulnone  PASS (range 60 to 260)\par
+\b Check 11 - diastolic_bp in range:\b0\i0\ulnone  PASS (range 30 to 160)\par
+\b Check 11 - glucose in range:\b0\i0\ulnone  PASS (range 20 to 600)\par
+\b Check 11 - cholesterol in range:\b0\i0\ulnone  PASS (range 50 to 500)\par
+\b Check 11 - creatinine in range:\b0\i0\ulnone  PASS (range 0.2 to 15)\par
+9196 rows passed validation\par
+}

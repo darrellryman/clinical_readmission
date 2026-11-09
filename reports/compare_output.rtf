@@ -1,0 +1,112 @@
+{\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}\f0\fs18
+\b Compare output:\b0\i0\ulnone  2026-11-09 16:48:37\par
+\par
+\par
+\b ###################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b Assessment 2: Applied MLOps pipeline project\b0\i0\ulnone \par
+\par
+\par
+\par
+\b Name:\b0\i0\ulnone  Darrell Ryman\par
+\par
+\b Student ID:\b0\i0\ulnone  S00445230\par
+\par
+\b Course:\b0\i0\ulnone  AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS\par
+\par
+\par
+\par
+\b Pipeline Stage:\b0\i0\ulnone  Compare\par
+\par
+\par
+\par
+\b Client question:\b0\i0\ulnone  At the point of discharge, will an adult inpatient be readmitted within 30 days?\par
+\par
+\b Response variable:\b0\i0\ulnone  readmission_30d\par
+\par
+\b Predictors:\b0\i0\ulnone  age, sex, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension\par
+\par
+\b Data source:\b0\i0\ulnone  data/processed/clean_synthetic_clinical_dataset.csv\par
+\par
+\par
+\par
+\b ##################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b \ul Validation checks\b0\i0\ulnone \par
+\b Check 1 - Table has rows:\b0\i0\ulnone  PASS (9196 rows)\par
+\b Check 2 - Required columns present:\b0\i0\ulnone  PASS (11 columns found)\par
+\b Check 3 - Minimum rows:\b0\i0\ulnone  PASS (9196 rows, minimum 10)\par
+\b Check 4 - No missing values in required columns:\b0\i0\ulnone  PASS (11 columns checked)\par
+\b Check 5 - Allowed values in sex:\b0\i0\ulnone  PASS (0 values outside ['Female', 'Male'])\par
+\b Check 6 - age in range:\b0\i0\ulnone  PASS (range 18 to 100)\par
+\b Check 7 - No duplicate rows:\b0\i0\ulnone  PASS (0 duplicate rows)\par
+\b Check 8 - readmission_30d is 0 or 1:\b0\i0\ulnone  PASS (0 other values)\par
+\b Check 9 - No unexpected columns:\b0\i0\ulnone  PASS (12 columns, all expected)\par
+\b Check 10 - Numeric columns hold numbers:\b0\i0\ulnone  PASS (9 columns checked)\par
+\b Check 11 - bmi in range:\b0\i0\ulnone  PASS (range 10 to 70)\par
+\b Check 11 - systolic_bp in range:\b0\i0\ulnone  PASS (range 60 to 260)\par
+\b Check 11 - diastolic_bp in range:\b0\i0\ulnone  PASS (range 30 to 160)\par
+\b Check 11 - glucose in range:\b0\i0\ulnone  PASS (range 20 to 600)\par
+\b Check 11 - cholesterol in range:\b0\i0\ulnone  PASS (range 50 to 500)\par
+\b Check 11 - creatinine in range:\b0\i0\ulnone  PASS (range 0.2 to 15)\par
+\par
+\b \ul Training Information\b0\i0\ulnone \par
+\par
+\b Training rows:\b0\i0\ulnone  7356.\par
+\par
+\b Test rows:\b0\i0\ulnone  1840.\par
+\par
+\b Cross-validation folds:\b0\i0\ulnone  5.\par
+\par
+\b Inputs the models see (11):\b0\i0\ulnone  age, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension, pulse_pressure, sex_Male\par
+\par
+              model      role          type  cv_auc_mean  cv_auc_std  accuracy    f1  precision  recall  roc_auc\par
+           baseline  baseline         dummy        0.500       0.000     0.860 0.795      0.000   0.000    0.500\par
+        rule_age_65 benchmark          rule        0.505       0.009     0.647 0.694      0.149   0.322    0.511\par
+logistic_regression candidate      logistic        0.606       0.020     0.646 0.699      0.224   0.616    0.639\par
+      random_forest candidate random_forest        0.599       0.024     0.653 0.705      0.227   0.612    0.636\par
+\par
+\b cv_auc_mean and cv_auc_std:\b0\i0\ulnone  AUC across the cross-validation slices of the training rows.\par
+\par
+\b accuracy to roc_auc:\b0\i0\ulnone  scores on the held-out test rows, measured once.\par
+\par
+\b Highest cross-validated AUC among the candidates:\b0\i0\ulnone  logistic_regression (0.606).\par
+\par
+\b Results table saved to: \b0\i0\ulnone  reports\\model_comparison.csv\par
+\par
+\b Evaluation evidence record saved to:\b0\i0\ulnone  reports\\evaluation_evidence.md\par
+\par
+\b \ul Run recorded in MLflow\b0\i0\ulnone \par
+\par
+\b Experiment: 'clinical_readmission'\b0\i0\ulnone \par
+\par
+\b Run: 'baseline'\b0\i0\ulnone \par
+\par
+\b Id: e194df9cdc0748ceae60c5302894bdb0'\b0\i0\ulnone \par
+\par
+\b \ul Run recorded in MLflow\b0\i0\ulnone \par
+\par
+\b Experiment: 'clinical_readmission'\b0\i0\ulnone \par
+\par
+\b Run: 'rule_age_65'\b0\i0\ulnone \par
+\par
+\b Id: 998f5acf97724288a7e0e46dee1bf98f'\b0\i0\ulnone \par
+\par
+\b \ul Run recorded in MLflow\b0\i0\ulnone \par
+\par
+\b Experiment: 'clinical_readmission'\b0\i0\ulnone \par
+\par
+\b Run: 'logistic_regression'\b0\i0\ulnone \par
+\par
+\b Id: 2c6f25cd342a4241a4e3c0a83e45fe88'\b0\i0\ulnone \par
+\par
+\b \ul Run recorded in MLflow\b0\i0\ulnone \par
+\par
+\b Experiment: 'clinical_readmission'\b0\i0\ulnone \par
+\par
+\b Run: 'random_forest'\b0\i0\ulnone \par
+\par
+\b Id: 0f4ac3c54cbd447eb500435de04b7bf5'\b0\i0\ulnone \par
+}

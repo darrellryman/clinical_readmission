@@ -47,7 +47,7 @@ clinical_readmission/
   data/
     raw/              the original CSV (never changed)
     processed/        the cleaned CSV (training and test patients) and features.csv, the encoded features
-    new/              the set-aside new patients and their answers (not committed)
+    new/              the set-aside new patients and their answers
   src/
     config.py         loads and checks config.yaml
     display.py        dataset summary printing and RTF output
@@ -64,8 +64,8 @@ clinical_readmission/
     answers_evidence.py   the assessment answers, each below its evidence
     check_setup.py    reports which packages and programs are installed
   tests/              pytest tests
-  artifacts/          the saved model and its model card (not committed)
-  reports/            metrics, comparison table, evidence record, predictions, RTF output (not committed)
+  artifacts/          the saved model and its model card
+  reports/            metrics, comparison table, evidence record, predictions, RTF output
 ```
 
 ## Reproduce the results from a fresh clone
@@ -125,11 +125,10 @@ python -m pytest tests -q
 
 **Step 8. Run the pipeline.** This downloads the data from Kaggle (no account needed), cleans it, trains and compares the models, and draws the graphs. It needs an internet connection. Choose one of the two ways. Both give the same results.
 
-Way A, two commands. The first downloads the data. DVC needs the raw file to exist before it starts, so it has to come first on a new clone.
+Way A, one command. The raw CSV is already in the repository, so DVC can start straight away. `--force` reruns every stage, because on a fresh clone DVC would otherwise report that everything is up to date.
 
 ```
-python -m src.ingest
-dvc repro
+dvc repro --force
 ```
 
 Way B, six commands, one after the other:
@@ -187,7 +186,7 @@ Small differences in the third decimal can appear if library versions differ. `r
 
 ## Loading the raw data
 
-The raw dataset isn't in this repository. Git ignores it, DVC tracks it, and there is no DVC remote, so a fresh clone has no copy. The data is a synthetic clinical dataset that mimics real patient records, from Kaggle: [Clinical Dataset](https://www.kaggle.com/datasets/uom190346a/synthetic-clinical-tabular-dataset).
+A copy of the raw dataset is committed to this repository at `data/raw/synthetic_clinical_dataset.csv`, so a fresh clone has it and there is no DVC remote to set up. The data is a synthetic clinical dataset that mimics real patient records, from Kaggle: [Clinical Dataset](https://www.kaggle.com/datasets/uom190346a/synthetic-clinical-tabular-dataset).
 
 Set `data.source` in `config.yaml` to choose where ingest gets it. There are three options. Whichever is chosen, the file ends up at `data.raw_path`, so everything after ingest, including DVC and MLflow, sees one raw file in one place.
 
@@ -380,8 +379,6 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 | train, evaluate, compare | `mlflow.db` | `Project root` | The MLflow database of runs: settings, scores, and tags for the Git commit and the data, config and model fingerprints. |
 | train, evaluate, compare | `mlruns/` | `Project root` | MLflow's copy of each run's files (model, model card, metrics, comparison table, evidence record), kept per run. |
 | dvc repro | `dvc.lock` | `Project root` | The recorded hashes of every stage's inputs and outputs for the last run, so DVC can tell what changed. |
-| dvc add (setup) | `synthetic_clinical_dataset.csv.dvc` | `data/raw/` | The small pointer file that stands in for the raw data in Git. Created once at setup, not on every run. |
-| dvc add, dvc repro | Hashed copies of tracked files | `.dvc/cache/` | DVC's local cache of the raw data and stage outputs, named by hash. There is no remote, so this is the only copy. |
 | **Test runs** | | | |
 | pytest | `{stage}_output.rtf (5 files)` | `reports/test/` | The RTF output written by the tests, kept apart so a test run never overwrites a real run's reports. |
 
@@ -411,13 +408,15 @@ Tracking is optional. Set `tracking.enabled: false` in `config.yaml`, or leave `
 
 ## Automated checks
 
-`.github/workflows/ci.yml` runs the tests on GitHub on every push to `main` and every pull request. It runs the tests only. It can't run the pipeline, because the raw dataset is tracked by DVC and isn't in Git.
+`.github/workflows/ci.yml` runs the tests on GitHub on every push to `main` and every pull request. It runs the tests only.
 
 ## Reproduce with DVC
 
 `dvc.yaml` describes seven stages: ingest, validate, train, evaluate, compare, plots and answers_evidence.
 
-On a fresh clone, skip the commands below. The DVC files are already in the repository. Run `python -m src.ingest` once to download the raw CSV (DVC stops if it is missing and the cache is empty), then run `dvc repro`.
+Every stage output is marked `cache: false` in `dvc.yaml`. DVC still records each file's hash in `dvc.lock`, but the files themselves (raw and processed data, the saved model and card, metrics, reports and graphs) are committed to Git. There is no DVC remote and no DVC cache to lose. A clone from GitHub has everything.
+
+On a fresh clone, skip the commands below. Run `dvc repro --force` to rebuild every stage, or `dvc repro` to check that nothing has changed.
 
 To set DVC up in a new folder that isn't a clone, DVC needs a Git repository, so run `git init` first. With DVC installed, from the project root:
 
@@ -426,11 +425,10 @@ git init
 dvc init
 git add .dvc .dvcignore
 git commit -m "Initialise DVC"
-dvc add data/raw/synthetic_clinical_dataset.csv
-git add data/raw/synthetic_clinical_dataset.csv.dvc
-git commit -m "Track raw data with DVC"
 dvc repro
 dvc metrics show
+git add -A
+git commit -m "Track the pipeline outputs"
 ```
 
 If the folder is already a Git repository, skip `git init`. Git asks for a name and email on the first commit. Set them once with `git config user.name "Your Name"` and `git config user.email "you@example.com"`.

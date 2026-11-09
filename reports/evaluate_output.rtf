@@ -1,0 +1,91 @@
+{\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}\f0\fs18
+\b Evaluate output:\b0\i0\ulnone  2026-11-09 16:48:28\par
+\par
+\par
+\b ###################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b Assessment 2: Applied MLOps pipeline project\b0\i0\ulnone \par
+\par
+\par
+\par
+\b Name:\b0\i0\ulnone  Darrell Ryman\par
+\par
+\b Student ID:\b0\i0\ulnone  S00445230\par
+\par
+\b Course:\b0\i0\ulnone  AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS\par
+\par
+\par
+\par
+\b Pipeline Stage:\b0\i0\ulnone  Evaluate\par
+\par
+\par
+\par
+\b Client question:\b0\i0\ulnone  At the point of discharge, will an adult inpatient be readmitted within 30 days?\par
+\par
+\b Response variable:\b0\i0\ulnone  readmission_30d\par
+\par
+\b Predictors:\b0\i0\ulnone  age, sex, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension\par
+\par
+\b Data source:\b0\i0\ulnone  data/processed/clean_synthetic_clinical_dataset.csv\par
+\par
+\par
+\par
+\b ##################################################################################\b0\i0\ulnone \par
+\par
+\par
+\b \ul Validation checks\b0\i0\ulnone \par
+\b Check 1 - Table has rows:\b0\i0\ulnone  PASS (9196 rows)\par
+\b Check 2 - Required columns present:\b0\i0\ulnone  PASS (11 columns found)\par
+\b Check 3 - Minimum rows:\b0\i0\ulnone  PASS (9196 rows, minimum 10)\par
+\b Check 4 - No missing values in required columns:\b0\i0\ulnone  PASS (11 columns checked)\par
+\b Check 5 - Allowed values in sex:\b0\i0\ulnone  PASS (0 values outside ['Female', 'Male'])\par
+\b Check 6 - age in range:\b0\i0\ulnone  PASS (range 18 to 100)\par
+\b Check 7 - No duplicate rows:\b0\i0\ulnone  PASS (0 duplicate rows)\par
+\b Check 8 - readmission_30d is 0 or 1:\b0\i0\ulnone  PASS (0 other values)\par
+\b Check 9 - No unexpected columns:\b0\i0\ulnone  PASS (12 columns, all expected)\par
+\b Check 10 - Numeric columns hold numbers:\b0\i0\ulnone  PASS (9 columns checked)\par
+\b Check 11 - bmi in range:\b0\i0\ulnone  PASS (range 10 to 70)\par
+\b Check 11 - systolic_bp in range:\b0\i0\ulnone  PASS (range 60 to 260)\par
+\b Check 11 - diastolic_bp in range:\b0\i0\ulnone  PASS (range 30 to 160)\par
+\b Check 11 - glucose in range:\b0\i0\ulnone  PASS (range 20 to 600)\par
+\b Check 11 - cholesterol in range:\b0\i0\ulnone  PASS (range 50 to 500)\par
+\b Check 11 - creatinine in range:\b0\i0\ulnone  PASS (range 0.2 to 15)\par
+\par
+\b \ul Metrics Information\b0\i0\ulnone \par
+\par
+\b Metrics written to:\b0\i0\ulnone  reports\\metrics.json\par
+\par
+\b Metrics results:\b0\i0\ulnone  \{'accuracy': 0.6461956521739131, 'f1': 0.6993362245586761, 'precision': 0.22362869198312235, 'recall': 0.6162790697674418, 'roc_auc': 0.6386528680210507\}\par
+\par
+\b \ul Run recorded in MLflow\b0\i0\ulnone \par
+\par
+\b Experiment: 'clinical_readmission'\b0\i0\ulnone \par
+\par
+\b Run: 'logistic_regression_test_scores'\b0\i0\ulnone \par
+\par
+\b Id: ab561e638381404cb173affcf21d274e'\b0\i0\ulnone \par
+\par
+\b \ul Error Counts On The Test Rows\b0\i0\ulnone \par
+\par
+ true_positive  false_negative  false_positive  true_negative\par
+           159              99             552           1030\par
+\par
+\b \ul Scores By Group\b0\i0\ulnone \par
+\par
+     group  rows  actual_rate  flagged_rate  precision  recall  roc_auc\par
+sex=Female   936        0.144         0.373      0.246   0.637    0.679\par
+  sex=Male   904        0.136         0.400      0.202   0.593    0.595\par
+  age=0-40   389        0.154         0.388      0.265   0.667    0.617\par
+ age=40-60   749        0.134         0.386      0.218   0.630    0.665\par
+ age=60-80   547        0.133         0.393      0.205   0.603    0.623\par
+age=80-120   155        0.161         0.361      0.214   0.480    0.620\par
+\par
+\b Model card status:\b0\i0\ulnone  Passed the automated gate. Awaiting sign-off: run python -m src.approve before any real use.\par
+\par
+\b Intended use:\b0\i0\ulnone  Help clinicians decide which adult inpatients get extra follow-up before discharge, by ranking patients on their risk of readmission within 30 days. A person makes the decision. The model only suggests.\par
+\par
+\b Not for:\b0\i0\ulnone  Automated decisions about care, any use on real patients, or any population that differs from the synthetic training data.\par
+\par
+\b Recall / precision on test rows:\b0\i0\ulnone  0.616 / 0.224\par
+}

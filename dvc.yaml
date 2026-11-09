@@ -2,7 +2,11 @@
 # the command to run, and what it writes (outs). `dvc repro` runs only the stages
 # whose inputs changed since the last run.
 #
-# predict is not here because it needs a new-patients file that you create.
+# Every output has cache: false. DVC still records its hash in dvc.lock, but the file
+# itself is committed to Git, so a clone from GitHub has the data, model and reports
+# without a DVC remote.
+#
+# approve, predict and serve are not here. They need a person or a new-patients file.
 #
 # answers_evidence reads the files the other stages write, so it runs last. It also
 # reads mlflow.db and the Git history, which DVC does not track. If only those
@@ -18,10 +22,14 @@ stages:
       - src/display.py
       - src/config.py
     outs:
-      - data/processed/clean_synthetic_clinical_dataset.csv
-      - data/new/new_synthetic_clinical_dataset.csv
-      - data/new/new_synthetic_clinical_dataset_answers.csv
-      - reports/ingest_output.rtf
+      - data/processed/clean_synthetic_clinical_dataset.csv:
+          cache: false
+      - data/new/new_synthetic_clinical_dataset.csv:
+          cache: false
+      - data/new/new_synthetic_clinical_dataset_answers.csv:
+          cache: false
+      - reports/ingest_output.rtf:
+          cache: false
 
   validate:
     cmd: python -m src.validate
@@ -33,7 +41,8 @@ stages:
       - src/display.py
       - src/ingest.py
     outs:
-      - reports/validate_output.rtf
+      - reports/validate_output.rtf:
+          cache: false
 
   train:
     cmd: python -m src.train
@@ -48,10 +57,14 @@ stages:
       - src/ingest.py
       - src/tracking.py
     outs:
-      - artifacts/model.joblib
-      - artifacts/model_card.json
-      - data/processed/features.csv
-      - reports/train_output.rtf
+      - artifacts/model.joblib:
+          cache: false
+      - artifacts/model_card.json:
+          cache: false
+      - data/processed/features.csv:
+          cache: false
+      - reports/train_output.rtf:
+          cache: false
 
   evaluate:
     cmd: python -m src.evaluate
@@ -68,9 +81,11 @@ stages:
       - src/train.py
       - src/validate.py
     metrics:
-      - reports/metrics.json
+      - reports/metrics.json:
+          cache: false
     outs:
-      - reports/evaluate_output.rtf
+      - reports/evaluate_output.rtf:
+          cache: false
 
   compare:
     cmd: python -m src.compare
@@ -87,9 +102,12 @@ stages:
       - src/tracking.py
       - src/validate.py
     outs:
-      - reports/model_comparison.csv
-      - reports/evaluation_evidence.md
-      - reports/compare_output.rtf
+      - reports/model_comparison.csv:
+          cache: false
+      - reports/evaluation_evidence.md:
+          cache: false
+      - reports/compare_output.rtf:
+          cache: false
 
   plots:
     cmd: python -m src.plots
@@ -107,8 +125,10 @@ stages:
       - src/tracking.py
       - src/validate.py
     outs:
-      - reports/figures
-      - reports/plots_output.rtf
+      - reports/figures:
+          cache: false
+      - reports/plots_output.rtf:
+          cache: false
 
   answers_evidence:
     cmd: python -m src.answers_evidence
@@ -130,4 +150,5 @@ stages:
       - src/tracking.py
       - src/validate.py
     outs:
-      - reports/answer_evidence_output.rtf
+      - reports/answer_evidence_output.rtf:
+          cache: false

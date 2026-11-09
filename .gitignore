@@ -20,21 +20,10 @@ htmlcov/
 # Notebooks
 .ipynb_checkpoints/
 
-# Project outputs (keep the folders, ignore the contents)
-data/*
-!data/.gitkeep
-
-# DVC: let Git see the .dvc pointer files in data/raw, but not the data itself
-!data/raw/
-data/raw/*
-!data/raw/*.dvc
-!data/raw/.gitignore
-artifacts/*
-!artifacts/.gitkeep
-# The architecture diagram is documentation, not a training output, so Git keeps it.
-!artifacts/Pipeline_Architecture_Diagram.jpg
-reports/*
-!reports/.gitkeep
+# Project outputs are committed: the raw and processed data, the saved model and its
+# card, the metrics and the stage reports. A clone from GitHub then holds everything,
+# with no need for a DVC remote. Only scratch output from the tests is left out.
+reports/test/
 
 # MLflow tracking store (local)
 mlflow.db

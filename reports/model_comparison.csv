@@ -1,0 +1,5 @@
+model,role,type,cv_auc_mean,cv_auc_std,accuracy,f1,precision,recall,roc_auc
+baseline,baseline,dummy,0.5,0.0,0.8598,0.795,0.0,0.0,0.5
+rule_age_65,benchmark,rule,0.5048,0.0093,0.6473,0.6936,0.149,0.3217,0.511
+logistic_regression,candidate,logistic,0.6065,0.02,0.6462,0.6993,0.2236,0.6163,0.6387
+random_forest,candidate,random_forest,0.5988,0.0243,0.6533,0.705,0.227,0.6124,0.6362

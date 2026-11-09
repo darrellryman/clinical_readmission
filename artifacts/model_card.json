@@ -1,0 +1,60 @@
+{
+  "model_type": "logistic_regression",
+  "created_utc": "2026-11-09 05:48:23",
+  "parameters": {
+    "max_iter": 1000,
+    "C": 1.0,
+    "class_weight": "balanced"
+  },
+  "target": "readmission_30d",
+  "input_columns": [
+    "age",
+    "sex",
+    "bmi",
+    "systolic_bp",
+    "diastolic_bp",
+    "glucose",
+    "cholesterol",
+    "creatinine",
+    "diabetes",
+    "hypertension"
+  ],
+  "model_columns": [
+    "age",
+    "bmi",
+    "systolic_bp",
+    "diastolic_bp",
+    "glucose",
+    "cholesterol",
+    "creatinine",
+    "diabetes",
+    "hypertension",
+    "pulse_pressure",
+    "sex_Male"
+  ],
+  "training_rows": 7356,
+  "training_positive_rate": 0.1404,
+  "random_state": 42,
+  "model_fingerprint": "80d004cb6100",
+  "data_fingerprint": "72360c885da0",
+  "config_fingerprint": "1f0f8b6c553f",
+  "git_commit": "e1e17a8-dirty",
+  "gate": {
+    "enabled": true,
+    "baseline_cv_auc": 0.5,
+    "model_cv_auc": 0.6064938855582332,
+    "auc_gain": 0.10649388555823325,
+    "required_gain": 0.05,
+    "passed": true
+  },
+  "status": "Passed the automated gate. Awaiting sign-off: run python -m src.approve before any real use.",
+  "intended_use": "Help clinicians decide which adult inpatients get extra follow-up before discharge, by ranking patients on their risk of readmission within 30 days. A person makes the decision. The model only suggests.",
+  "not_for": "Automated decisions about care, any use on real patients, or any population that differs from the synthetic training data.",
+  "known_limits": [
+    "The data is synthetic, so the scores say nothing about real patients.",
+    "Signal is weak. About four in five flagged patients are not readmitted.",
+    "No date or site column, so a time-based or site-based check was not possible.",
+    "Fairness was checked by sex and age band only. No ethnicity or Indigenous status data exists.",
+    "Patients outside the age range 18 to 100 were removed, so the model says nothing about children."
+  ]
+}
