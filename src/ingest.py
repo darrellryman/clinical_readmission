@@ -27,8 +27,11 @@
 
     Where the raw data comes from is set by data.source. "file" reads data.raw_path.
     "url" downloads data.raw_url into data.raw_path (with a timeout and retries)
-    and reads that copy. Each run prints the source, the location, the time and a
-    fingerprint of the file, so you can show which data a run used.
+    and reads that copy. "kaggle" downloads one file of a Kaggle dataset
+    (data.kaggle_dataset and data.kaggle_file) into data.raw_path with the
+    kagglehub package, and reads that copy. Each run prints the source, the
+    location, the time and a fingerprint of the file, so you can show which data
+    a run used.
 
     The printed output is saved to an RTF file instead of the screen. The file name
     comes from outputs.rtf_path in config.yaml (the text {stage} becomes the stage name).
@@ -45,6 +48,7 @@ import argparse
 # are used to download a url source with a pause between attempts.
 import datetime
 import hashlib
+import shutil
 import time
 import urllib.error
 import urllib.request
@@ -147,6 +151,50 @@ def pthDownloadFile(strUrl: str, varPath, intTimeout: int, intRetries: int) -> P
     raise ConnectionError(f"Could not download {strUrl} after {intRetries} attempts. Last error: {strLastError}")
 
 
+def pthDownloadKaggle(strDataset: str, strFile: str, varPath) -> Path:
+    """Download one file of a Kaggle dataset to a local file, using the kagglehub package.
+
+    The file is copied byte for byte, so the same dataset version always gives the
+    same fingerprint as the CSV downloaded by hand. kagglehub keeps its own cache,
+    so a repeat run does not download the file again.
+
+    Args:
+        strDataset: The dataset, as owner/name, for example
+            "uom190346a/synthetic-clinical-tabular-dataset".
+        strFile: The file inside the dataset, for example "synthetic_clinical_dataset.csv".
+        varPath: Where to save the file, as text or a Path. The folder is
+            created if it doesn't exist.
+
+    Returns:
+        The path of the saved file.
+
+    Raises:
+        ImportError: If kagglehub is not installed. The message gives the install command.
+        ConnectionError: If the download failed. The message names the dataset,
+            the file and the error.
+    """
+    # Imported here so the rest of the pipeline works without kagglehub installed.
+    try:
+        import kagglehub
+    except ImportError:
+        raise ImportError("data.source is kaggle but kagglehub is not installed. Run: pip install kagglehub") from None
+
+    try:
+        pthCached = Path(kagglehub.dataset_download(strDataset, path=strFile))
+    except Exception as objError:  # noqa: BLE001 - kagglehub raises several error types
+        raise ConnectionError(f"Could not download {strFile} from Kaggle dataset {strDataset}: {objError}") from None
+    if not pthCached.is_file() or pthCached.stat().st_size == 0:
+        raise ConnectionError(f"Kaggle dataset {strDataset} gave no usable file for {strFile}")
+
+    pthFile = Path(varPath)
+    pthFile.parent.mkdir(parents=True, exist_ok=True)
+    # Copy to a temporary name first, so a half finished copy never replaces a good file.
+    pthTemp = pthFile.with_name(pthFile.name + ".part")
+    shutil.copyfile(pthCached, pthTemp)
+    pthTemp.replace(pthFile)
+    return pthFile
+
+
 def strFileFingerprint(varPath) -> str:
     """Return a short fingerprint of a file, so two loads can be compared.
 
@@ -169,8 +217,10 @@ def tplLoadRawData(dctData: dict) -> tuple:
 
     data.source decides where the data comes from. For "file" the CSV at
     data.raw_path is read. For "url" data.raw_url is downloaded into
-    data.raw_path first and that local copy is read, so the rest of the
-    pipeline always works from one raw file in one place.
+    data.raw_path first and that local copy is read. For "kaggle" the file
+    data.kaggle_file of the dataset data.kaggle_dataset is downloaded into
+    data.raw_path and that local copy is read. So the rest of the pipeline
+    always works from one raw file in one place.
 
     Args:
         dctData: The data section of the config.
@@ -189,6 +239,9 @@ def tplLoadRawData(dctData: dict) -> tuple:
     if strSource == "url":
         strLocation = dctData["raw_url"]
         pthDownloadFile(strLocation, pthLocal, dctData["download_timeout"], dctData["download_retries"])
+    elif strSource == "kaggle":
+        strLocation = f"kaggle:{dctData['kaggle_dataset']}/{dctData['kaggle_file']}"
+        pthDownloadKaggle(dctData["kaggle_dataset"], dctData["kaggle_file"], pthLocal)
     else:
         strLocation = str(pthLocal)
 

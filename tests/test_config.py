@@ -198,7 +198,7 @@ def test_age_limit_needs_the_value_column_to_be_kept(dctConfig, tmp_path, strEnd
 # ---------------------------------------------------------------------------
 # data.source, raw_url and the download settings
 # ---------------------------------------------------------------------------
-def test_source_must_be_file_or_url(dctConfig, tmp_path):
+def test_source_must_be_file_url_or_kaggle(dctConfig, tmp_path):
     """Any other source name is refused."""
     dctConfig["data"]["source"] = "ftp"
     pthFile = tmp_path / "c.yaml"
@@ -228,6 +228,20 @@ def test_a_valid_url_source_loads(dctConfig, tmp_path):
     pthFile = tmp_path / "c.yaml"
     pthFile.write_text(yaml.safe_dump(dctConfig))
     assert dctLoadConfig(pthFile)["data"]["source"] == "url"
+
+
+def test_a_kaggle_source_needs_a_dataset_and_a_file(dctConfig, tmp_path):
+    """source kaggle with a blank or missing dataset or file name is refused, and a full one loads."""
+    dctConfig["data"]["source"] = "kaggle"
+    pthFile = tmp_path / "c.yaml"
+    for strKey in ("kaggle_dataset", "kaggle_file"):
+        dctBad = {**dctConfig, "data": {**dctConfig["data"], "kaggle_dataset": "o/n", "kaggle_file": "f.csv", strKey: " "}}
+        pthFile.write_text(yaml.safe_dump(dctBad))
+        with pytest.raises(ConfigError, match=strKey):
+            dctLoadConfig(pthFile)
+    dctGood = {**dctConfig, "data": {**dctConfig["data"], "kaggle_dataset": "o/n", "kaggle_file": "f.csv"}}
+    pthFile.write_text(yaml.safe_dump(dctGood))
+    assert dctLoadConfig(pthFile)["data"]["source"] == "kaggle"
 
 
 def test_download_settings_must_be_whole_numbers_of_at_least_one(dctConfig, tmp_path):

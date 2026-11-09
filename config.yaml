@@ -20,14 +20,19 @@ project:
 # Where the data lives.
 data:
   # Where the raw data comes from. "file" reads raw_path as it is. "url" downloads
-  # raw_url into raw_path first, then reads that local copy, so every later stage
-  # (and DVC and MLflow) still sees one raw file in one place.
-  source: file
+  # raw_url into raw_path first, then reads that local copy. "kaggle" downloads
+  # kaggle_file from the Kaggle dataset kaggle_dataset (needs: pip install kagglehub)
+  # into raw_path. Either way every later stage (and DVC and MLflow) still sees one
+  # raw file in one place.
+  source: kaggle
   # The original dataset as you received it. Only ingest.py reads this file.
   # With source: url this is where the download is saved.
   raw_path: data/raw/synthetic_clinical_dataset.csv
   # The web address to download when source is url (http or https). Leave null for a file.
   raw_url: null
+  # The Kaggle dataset (owner/name) and the file inside it, used when source is kaggle.
+  kaggle_dataset: uom190346a/synthetic-clinical-tabular-dataset
+  kaggle_file: synthetic_clinical_dataset.csv
   # Seconds to wait for the server on each download attempt, and how many
   # attempts to make before ingest stops with an error. Used only for a url.
   download_timeout: 30

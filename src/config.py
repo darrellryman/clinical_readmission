@@ -164,8 +164,12 @@ def subCheckConfig(dctConfig) -> None:
     # Where the raw data comes from. A url source needs an http or https address,
     # and the timeout and retry count have to be whole numbers of at least 1.
     if isinstance(dctData, dict) and "source" in dctData:
-        if dctData["source"] not in ("file", "url"):
-            lstProblems.append("'data.source' must be file or url")
+        if dctData["source"] not in ("file", "url", "kaggle"):
+            lstProblems.append("'data.source' must be file, url or kaggle")
+        elif dctData["source"] == "kaggle":
+            for strKey in ("kaggle_dataset", "kaggle_file"):
+                if not isinstance(dctData.get(strKey), str) or not dctData[strKey].strip():
+                    lstProblems.append(f"'data.{strKey}' must be text when data.source is kaggle")
         elif dctData["source"] == "url":
             varUrl = dctData.get("raw_url")
             if not isinstance(varUrl, str) or not varUrl.lower().startswith(("http://", "https://")):

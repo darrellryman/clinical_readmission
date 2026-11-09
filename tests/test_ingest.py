@@ -383,3 +383,56 @@ def test_only_http_and_https_addresses_are_downloaded(tmp_path):
     """file: and ftp: addresses are refused."""
     with pytest.raises(ValueError, match="http"):
         pthDownloadFile("file:///etc/passwd", tmp_path / "d.csv", 5, 1)
+
+
+# ---------------------------------------------------------------------------
+# data.source = kaggle
+# ---------------------------------------------------------------------------
+def _fakeKagglehub(monkeypatch, pthCached=None, objError=None):
+    """Put a stand-in kagglehub module in place, so no network or account is needed."""
+    import sys
+    import types
+    objModule = types.ModuleType("kagglehub")
+
+    def dataset_download(strHandle, path=None):
+        if objError:
+            raise objError
+        return str(pthCached)
+
+    objModule.dataset_download = dataset_download
+    monkeypatch.setitem(sys.modules, "kagglehub", objModule)
+
+
+def test_a_kaggle_source_copies_the_file_into_raw_path_byte_for_byte(tmp_path, monkeypatch):
+    """The Kaggle file is copied unchanged to raw_path, then read, and the load is described."""
+    from src.ingest import pthDownloadKaggle
+    pthCached = tmp_path / "cache.csv"
+    pthCached.write_bytes(b"a,b\r\n1,2\r\n3,4\r\n")
+    _fakeKagglehub(monkeypatch, pthCached)
+    pthRaw = tmp_path / "raw" / "data.csv"
+    dfData, dctInfo = tplLoadRawData({"source": "kaggle", "raw_path": str(pthRaw), "raw_url": None,
+                                      "kaggle_dataset": "owner/name", "kaggle_file": "data.csv",
+                                      "download_timeout": 5, "download_retries": 1})
+    assert pthRaw.read_bytes() == pthCached.read_bytes()
+    assert len(dfData) == 2
+    assert dctInfo["source"] == "kaggle"
+    assert dctInfo["location"] == "kaggle:owner/name/data.csv"
+    assert not (tmp_path / "raw" / "data.csv.part").exists()
+
+
+def test_a_failed_kaggle_download_is_reported_with_the_dataset_and_file(tmp_path, monkeypatch):
+    """A kagglehub error becomes a ConnectionError that names the dataset, the file and the cause."""
+    from src.ingest import pthDownloadKaggle
+    _fakeKagglehub(monkeypatch, objError=RuntimeError("401 unauthorised"))
+    with pytest.raises(ConnectionError, match="owner/name.*401 unauthorised|data.csv.*owner/name"):
+        pthDownloadKaggle("owner/name", "data.csv", tmp_path / "d.csv")
+    assert not (tmp_path / "d.csv").exists()
+
+
+def test_kaggle_without_kagglehub_installed_says_how_to_install_it(tmp_path, monkeypatch):
+    """A missing kagglehub package gives the install command, not a bare import error."""
+    import sys
+    from src.ingest import pthDownloadKaggle
+    monkeypatch.setitem(sys.modules, "kagglehub", None)
+    with pytest.raises(ImportError, match="pip install kagglehub"):
+        pthDownloadKaggle("owner/name", "data.csv", tmp_path / "d.csv")

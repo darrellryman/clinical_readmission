@@ -20,7 +20,7 @@ Each stage is its own program. They pass results to each other through files.
 
 | Stage | Command | What it does |
 |---|---|---|
-| Ingest | `python -m src.ingest` | Loads the raw CSV from a file or a url (`data.source`), keeps the listed columns, cleans it, drops rows whose sex isn't Female or Male, removes patients outside the age range, sets aside a share of patients as "new" patients, saves a cleaned copy |
+| Ingest | `python -m src.ingest` | Loads the raw CSV from a file, a url or Kaggle (`data.source`), keeps the listed columns, cleans it, drops rows whose sex isn't Female or Male, removes patients outside the age range, sets aside a share of patients as "new" patients, saves a cleaned copy |
 | Validate | `python -m src.validate` | Checks the cleaned data against the rules before anything uses it |
 | Train | `python -m src.train` | Builds features, splits train and test, saves the encoded features for inspection, fits logistic regression, checks it against the approval gate, then saves the model and a model card |
 | Evaluate | `python -m src.evaluate` | Scores the model on the test rows, writes the metrics file, and prints the error counts and the scores by sex and age band |
@@ -127,7 +127,9 @@ Small differences in the third decimal can appear if library versions differ. `r
 - `file` reads `data.raw_path`.
 - `url` downloads `data.raw_url` (http or https only) into `data.raw_path`, then reads that copy. Everything after ingest, including DVC and MLflow, still sees one raw file in one place.
 
-A download waits `download_timeout` seconds per attempt and tries up to `download_retries` times, pausing a little longer after each failure. It is written to a temporary name first, so a failed or half finished download never replaces a good copy. If every attempt fails, ingest stops with a message that names the address and the last error. An empty or header-only file also stops the run.
+With `kaggle`, ingest downloads `data.kaggle_file` from the Kaggle dataset `data.kaggle_dataset` into `data.raw_path` with the `kagglehub` package (`pip install kagglehub`), so the CSV no longer has to be downloaded by hand. The file is copied byte for byte, so the fingerprint matches the hand-downloaded CSV. Kaggle may ask for credentials the first time (see the kagglehub documentation).
+
+A url download waits `download_timeout` seconds per attempt and tries up to `download_retries` times, pausing a little longer after each failure. It is written to a temporary name first, so a failed or half finished download never replaces a good copy. If every attempt fails, ingest stops with a message that names the address and the last error. An empty or header-only file also stops the run.
 
 Each run prints the source type, the location, the time and a short fingerprint of the file at the top of `reports/ingest_output.rtf`. The same bytes always give the same fingerprint, so two runs can be compared. `python -m src.ingest --input some/file.csv` still reads a local file and overrides the config.
 
@@ -147,9 +149,11 @@ The settings you're most likely to touch:
 
 ```
 data:
-  source: file                           # file, or url to download raw_url first
+  source: file                           # file, url (download raw_url first) or kaggle (download from Kaggle first)
   raw_path: data/raw/synthetic_clinical_dataset.csv   # the raw file (a url download is saved here)
   raw_url: null                          # http or https address, used when source is url
+  kaggle_dataset: uom190346a/synthetic-clinical-tabular-dataset   # owner/name, used when source is kaggle
+  kaggle_file: synthetic_clinical_dataset.csv                      # the file inside that dataset
   download_timeout: 30                   # seconds to wait on each download attempt
   download_retries: 3                    # attempts before ingest stops with an error
   keep_columns: [age, sex, bmi, ...]     # columns kept at ingest
@@ -296,7 +300,7 @@ Every file the solution writes when it runs, where it goes and what it holds. Lo
 python -m pytest tests
 ```
 
-208 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
+212 tests. They use their own small config, so editing `config.yaml` for your data won't break them. One test checks that `config.yaml` itself is complete.
 
 ## Track runs with MLflow
 

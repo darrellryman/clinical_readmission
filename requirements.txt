@@ -11,6 +11,9 @@ scikit-learn>=1.3
 joblib>=1.3
 pyyaml>=6.0
 
+# Kaggle download (data.source: kaggle in config.yaml). Optional: only needed for that source.
+kagglehub
+
 # Testing
 pytest>=7.0
 
