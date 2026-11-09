@@ -68,24 +68,6 @@ clinical_readmission/
   reports/            metrics, comparison table, evidence record, predictions, RTF output (not committed)
 ```
 
-## Setup
-
-```
-python -m venv .venv
-source .venv/Scripts/activate  # Windows Git Bash
-# macOS or Linux:  source .venv/bin/activate
-# Windows PowerShell:  .venv\Scripts\activate
-# Install the libraries. The file lists the core ones plus optional MLflow, FastAPI
-# and matplotlib. Delete the lines you don't want first.
-pip install -r requirements.txt
-# Adds the MLflow web page files, without pyarrow (no Windows on ARM build). Skip it if you
-# won't run mlflow ui.
-pip install mlflow==3.18.0 --no-deps --force-reinstall
-python src/check_setup.py
-```
-
-The last line lists what is installed and prints one `pip` command for anything missing. On Windows on ARM, a few packages need pinning or a two-step install. The Git setup guide covers those.
-
 ## Reproduce the results from a fresh clone
 
 Follow these steps in order. Every command is typed into a terminal, from the folder named in each step. The commands below use Git Bash on Windows. On macOS or Linux, only step 4 differs.
@@ -120,10 +102,11 @@ source .venv/Scripts/activate      # Windows, Git Bash
 source .venv/bin/activate          # macOS or Linux
 ```
 
-**Step 5. Install the libraries.** This needs an internet connection and takes a few minutes.
+**Step 5. Install the libraries.** This needs an internet connection and takes a few minutes. Run both lines. The second adds the MLflow web page files without pyarrow (there is no Windows on ARM build of it).
 
 ```
 pip install -r requirements.txt
+pip install mlflow==3.18.0 --no-deps --force-reinstall
 ```
 
 **Step 6. Check the setup.** It should report nothing missing. If it prints a `pip` command, run that command, then run this step again.
@@ -131,6 +114,8 @@ pip install -r requirements.txt
 ```
 python src/check_setup.py
 ```
+
+On Windows on ARM, a few packages need pinning or a two-step install. The Git setup guide covers those.
 
 **Step 7. Run the tests.** All of them should pass.
 
@@ -140,9 +125,10 @@ python -m pytest tests -q
 
 **Step 8. Run the pipeline.** This downloads the data from Kaggle (no account needed), cleans it, trains and compares the models, and draws the graphs. It needs an internet connection. Choose one of the two ways. Both give the same results.
 
-Way A, one command:
+Way A, two commands. The first downloads the data. DVC needs the raw file to exist before it starts, so it has to come first on a new clone.
 
 ```
+python -m src.ingest
 dvc repro
 ```
 
@@ -195,26 +181,48 @@ The random seed and every setting live in `config.yaml`, and models run on one t
 
 Small differences in the third decimal can appear if library versions differ. `requirements.txt` sets minimum versions for most libraries and pins only the MLflow ones, so a newer scikit-learn may move a score slightly. Every output file is listed in [Output files](#output-files).
 
+**Step 13. Prediction Service** To serve predictions over a web API once the model is approved, see [Prediction service](#prediction-service).
+
+**Step 14. Track Runs With MLflow** To browse the logged runs, metrics and models in the MLflow web page, see [Track runs with MLflow](#track-runs-with-mlflow).
+
 ## Loading the raw data
 
-`data.source` in `config.yaml` says where the raw data comes from, and ingest loads it the same way every run.
+The raw dataset isn't in this repository. Git ignores it, DVC tracks it, and there is no DVC remote, so a fresh clone has no copy. The data is a synthetic clinical dataset that mimics real patient records, from Kaggle: [Clinical Dataset](https://www.kaggle.com/datasets/uom190346a/synthetic-clinical-tabular-dataset).
 
-- `file` reads `data.raw_path`.
-- `url` downloads `data.raw_url` (http or https only) into `data.raw_path`, then reads that copy. Everything after ingest, including DVC and MLflow, still sees one raw file in one place.
+Set `data.source` in `config.yaml` to choose where ingest gets it. There are three options. Whichever is chosen, the file ends up at `data.raw_path`, so everything after ingest, including DVC and MLflow, sees one raw file in one place.
 
-With `kaggle`, ingest downloads `data.kaggle_file` from the Kaggle dataset `data.kaggle_dataset` into `data.raw_path` with the `kagglehub` package (`pip install kagglehub`), so the CSV no longer has to be downloaded by hand. The file is copied byte for byte, so the fingerprint matches the hand-downloaded CSV. No Kaggle login is needed for this public dataset. If a different dataset asks for credentials, set `KAGGLE_USERNAME` and `KAGGLE_KEY` (see the kagglehub documentation) and never commit them.
+**kaggle (the default).** Ingest downloads the file from Kaggle itself, using the `kagglehub` package that `requirements.txt` installs. No Kaggle account or login is needed for this public dataset.
 
-A url download waits `download_timeout` seconds per attempt and tries up to `download_retries` times, pausing a little longer after each failure. It is written to a temporary name first, so a failed or half finished download never replaces a good copy. If every attempt fails, ingest stops with a message that names the address and the last error. An empty or header-only file also stops the run.
+```
+data:
+  source: kaggle
+  kaggle_dataset: uom190346a/synthetic-clinical-tabular-dataset
+  kaggle_file: synthetic_clinical_dataset.csv
+```
 
-Each run prints the source type, the location, the time and a short fingerprint of the file at the top of `reports/ingest_output.rtf`. The same bytes always give the same fingerprint, so two runs can be compared. `python -m src.ingest --input some/file.csv` still reads a local file and overrides the config.
+Then run `python -m src.ingest`. If a different dataset asks for credentials, set `KAGGLE_USERNAME` and `KAGGLE_KEY` (see the kagglehub documentation) and never commit them.
 
-## Getting the raw data
+**file.** Ingest reads a CSV that has already been downloaded by hand. A manual download from the Kaggle page needs a free Kaggle account.
 
-The raw dataset isn't in this repository. Git ignores it and DVC tracks it, and there is no DVC remote, so a fresh clone has no copy. Ingest downloads it from Kaggle by default (`data.source: kaggle`), so `python -m src.ingest` is all a fresh clone needs. To fetch it by hand instead, set `data.source: file` and follow the steps below. The data comes from Kaggle: [Clinical Dataset](https://www.kaggle.com/datasets/uom190346a/synthetic-clinical-tabular-dataset), described there as a clinical dataset mimicking real-world patient records. The data is synthetic.
+```
+data:
+  source: file
+  raw_path: data/raw/synthetic_clinical_dataset.csv
+```
 
-1. Download the CSV from the Kaggle page. A manual download needs a free Kaggle account.
-2. Save it as `data/raw/synthetic_clinical_dataset.csv`. Rename it if the downloaded file has a different name.
-3. Run `python -m src.ingest`, then the other stages in the table above.
+Download the CSV from the Kaggle page, save it at that path (rename it if the downloaded file has a different name), then run `python -m src.ingest`. To read a file from somewhere else for one run only, use `python -m src.ingest --input some/file.csv`, which overrides the config.
+
+**url.** Ingest downloads the CSV from a direct web address (http or https only) and saves it at `data.raw_path`. The address has to point straight at the file. A normal Kaggle page link won't work, because Kaggle asks for a login.
+
+```
+data:
+  source: url
+  raw_url: https://example.com/path/to/synthetic_clinical_dataset.csv
+```
+
+Then run `python -m src.ingest`. Each attempt waits `data.download_timeout` seconds and tries up to `data.download_retries` times, pausing a little longer after each failure. The download is written to a temporary name first, so a failed or half finished download never replaces a good copy. If every attempt fails, ingest stops with a message naming the address and the last error.
+
+Every option stops the run on an empty or header-only file. Each run prints the source type, the location, the time and a short fingerprint of the file at the top of `reports/ingest_output.rtf`. The same bytes always give the same fingerprint, so two runs can be compared, and a Kaggle download matches the same file downloaded by hand.
 
 The Kaggle page doesn't state a licence or a file layout, so check the page's terms before reusing the data. If the file's columns differ from `data.keep_columns` in `config.yaml`, ingest and validate stop with a message naming what's missing.
 
@@ -289,9 +297,17 @@ One function, `dfEngineerFeatures` in `src/features.py`, builds these columns. I
 
 ## Approval gate and model card
 
-`train.py` checks the model before saving it. Its cross-validated AUC on the training rows must beat the do-nothing baseline by at least `approval.min_auc_gain` (0.05). A model that fails isn't saved, and the stage stops with `ModelGateError`. The threshold sits in the config because it should come from the intended use and the cost of errors. Passing the gate isn't clinical approval. A named person still has to sign off.
+The prediction commands refuse to run until a named person has signed off. Replace the four values with the real person's details. This writes `approvals/signoff.json`.
 
-The sign-off is a separate step. After reading the card and `reports/evaluation_evidence.md`, the person runs `python -m src.approve` with their name, role, decision and reason. It writes `approvals/signoff.json` with the fingerprint of the model they approved. `predict.py` and `serve.py` stop with `ModelNotApprovedError` if the file is missing, the decision is "rejected", or the model file no longer matches the fingerprint. A retrained model that comes out different needs a new sign-off. A failed-gate model can't be approved. Commit the sign-off file to Git, so the history shows who approved what and when. It is a plain file, so a real system would sign it or keep it somewhere with access control. Set `approval.require_signoff` to false to switch the check off.
+```
+python -m src.approve --name "Jane Smith" --role "Clinical owner" --decision approved --reason "Reviewed the model card and test results"
+```
+
+Read `artifacts/model_card.json` and `reports/evaluation_evidence.md` before signing. The sign-off file records the fingerprint of the model that was approved. `predict.py` and `serve.py` stop with `ModelNotApprovedError` if the file is missing, the decision is "rejected", or the model file no longer matches the fingerprint. A retrained model that comes out different needs a new sign-off. Commit the file to Git, so the history shows who approved what and when. It is a plain file, so a real system would sign it or keep it somewhere with access control.
+
+***Set `approval.require_signoff` to false to switch the check off.***
+
+Before any of that, `train.py` has to pass a gate. The model's cross-validated AUC on the training rows must beat the do-nothing baseline by at least `approval.min_auc_gain` (0.05). A model that fails isn't saved, the stage stops with `ModelGateError`, and it can't be approved. The threshold sits in the config because it should come from the intended use and the cost of errors. Passing the gate isn't clinical approval. The named person still decides.
 
 A model that passes is saved with `artifacts/model_card.json`: the model type and settings, the input columns, the data, config and model fingerprints, the git commit, the gate result, the intended use and the known limits. `compare.py` writes `reports/evaluation_evidence.md`, which pulls the results, the recommended model, the limits and the recommendation into one page.
 
@@ -401,7 +417,7 @@ Tracking is optional. Set `tracking.enabled: false` in `config.yaml`, or leave `
 
 `dvc.yaml` describes seven stages: ingest, validate, train, evaluate, compare, plots and answers_evidence.
 
-On a fresh clone, skip the commands below. The DVC files are already in the repository, so run `dvc repro`.
+On a fresh clone, skip the commands below. The DVC files are already in the repository. Run `python -m src.ingest` once to download the raw CSV (DVC stops if it is missing and the cache is empty), then run `dvc repro`.
 
 To set DVC up in a new folder that isn't a clone, DVC needs a Git repository, so run `git init` first. With DVC installed, from the project root:
 
