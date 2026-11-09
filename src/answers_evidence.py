@@ -1128,7 +1128,7 @@ def subAnswerTrain(dctConfig: dict, strInputPath: str) -> None:
     # The model file above came from the data, code and config at this commit. Explain how to trace it (dvc.lock, Git commit).
     subPrintStep(
         "Step 4 - Explain how another team member could identify which data, code, configuration and evidence produced the selected model.",
-        "The model card records the Git commit, the random seed, and fingerprints of the model, the data and config.yaml. Checking out that commit restores the same code, config, data and model, and dvc.lock holds the hashes to verify them. The same commit and fingerprints are tagged on the MLflow run, so matching fingerprints mean the same model, data and configuration.",
+        "The model card records the Git commit it was trained from, the random seed, and fingerprints of the model, the data and config.yaml. Checking out the commit that stores the model restores the same code, config, data and model, and dvc.lock holds the hashes to verify them. The same commit and fingerprints are tagged on the MLflow run, so matching fingerprints mean the same model, data and configuration.",
     )
 
     # The model file saved above is reused by evaluate.py and predict.py. Say what it contains and what it does not.
