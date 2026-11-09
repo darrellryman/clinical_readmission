@@ -38,8 +38,8 @@ stages:
       size: 526919
     - path: reports/ingest_output.rtf
       hash: md5
-      md5: e2eacb53cf031773e5dee345c4e9dce1
-      size: 12646
+      md5: 6bee263de41df226acfba63cfa44bdb2
+      size: 12484
   validate:
     cmd: python -m src.validate
     deps:
@@ -70,7 +70,7 @@ stages:
     outs:
     - path: reports/validate_output.rtf
       hash: md5
-      md5: fa3042204055cd47f019aab3b8675ad6
+      md5: 66b33e1a39e35e72466478c49c705c01
       size: 7551
   train:
     cmd: python -m src.train
@@ -118,7 +118,7 @@ stages:
       size: 6784
     - path: artifacts/model_card.json
       hash: md5
-      md5: 4f40c97e8a8202b4d10bc50babf83668
+      md5: 8d8a815881539e0bb7cff5faf11d7afc
       size: 2022
     - path: data/processed/features.csv
       hash: md5
@@ -126,7 +126,7 @@ stages:
       size: 507650
     - path: reports/train_output.rtf
       hash: md5
-      md5: da362e8b13c0b3eb919e1672f0057c8d
+      md5: fad79909e0b24ddf74c5d0a0deba8a3a
       size: 3078
   evaluate:
     cmd: python -m src.evaluate
@@ -178,7 +178,7 @@ stages:
     outs:
     - path: reports/evaluate_output.rtf
       hash: md5
-      md5: cb8f9d8d1390fb9e0cd1a7fdc4b6b0ad
+      md5: 23a71c5627e5dbc072b9db9d800310c8
       size: 4461
     - path: reports/metrics.json
       hash: md5
@@ -234,7 +234,7 @@ stages:
     outs:
     - path: reports/compare_output.rtf
       hash: md5
-      md5: c6241e2aeb2bdc31eaf173c2de70c527
+      md5: 1da9940a89413c3a754cd57db148fef7
       size: 4877
     - path: reports/evaluation_evidence.md
       hash: md5
@@ -303,7 +303,7 @@ stages:
       nfiles: 4
     - path: reports/plots_output.rtf
       hash: md5
-      md5: b87689563dbf1204ea7cd4b87ff7f423
+      md5: d6aabb6faad5c70c6c80c38aaae46462
       size: 484868
   answers_evidence:
     cmd: python -m src.answers_evidence
@@ -314,7 +314,7 @@ stages:
       size: 6784
     - path: artifacts/model_card.json
       hash: md5
-      md5: 4f40c97e8a8202b4d10bc50babf83668
+      md5: 8d8a815881539e0bb7cff5faf11d7afc
       size: 2022
     - path: config.yaml
       hash: md5
@@ -376,5 +376,5 @@ stages:
     outs:
     - path: reports/answer_evidence_output.rtf
       hash: md5
-      md5: 0715c805b2188165ed951349119ce797
-      size: 1217350
+      md5: 17a46263e5a0a6e449ee6372c137b47a
+      size: 1218420

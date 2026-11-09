@@ -88,12 +88,65 @@ The last line lists what is installed and prints one `pip` command for anything 
 
 ## Reproduce the results from a fresh clone
 
-Everything below runs from the project root. Python 3.12 is what the automated checks use. Git, and a free Kaggle account for the data, are the only things you need besides Python.
+Follow these steps in order. Every command is typed into a terminal, from the folder named in each step. The commands below use Git Bash on Windows. On macOS or Linux, only step 4 differs.
 
-1. Get the code and set up. Clone the repository, then follow [Setup](#setup) to make the virtual environment and install `requirements.txt`. `python src/check_setup.py` should report nothing missing.
-2. Get the raw data. It isn't in the repository, so follow [Getting the raw data](#getting-the-raw-data) and save it as `data/raw/synthetic_clinical_dataset.csv`.
-3. Run the tests: `python -m pytest tests -q`. All of them should pass.
-4. Run the pipeline, in this order:
+**Step 1. Install Python and Git.** Skip this if both are already installed. Check by running:
+
+```
+python --version
+git --version
+```
+
+Python should report 3.12 (the version the automated checks use). If either command isn't found, install it from python.org or git-scm.com and open a new terminal.
+
+**Step 2. Download the code.** Run these two lines. The first makes a folder called `clinical_readmission` and the second moves into it. All later steps run from inside this folder.
+
+```
+git clone https://github.com/darrellryman/clinical_readmission.git
+cd clinical_readmission
+```
+
+**Step 3. Create a virtual environment.** This keeps the project's libraries separate from the rest of the computer.
+
+```
+python -m venv .venv
+```
+
+**Step 4. Switch the virtual environment on.** Run the line for the system in use. The terminal prompt then starts with `(.venv)`. Repeat this step each time a new terminal is opened.
+
+```
+source .venv/Scripts/activate      # Windows, Git Bash
+.venv\Scripts\activate             # Windows, PowerShell
+source .venv/bin/activate          # macOS or Linux
+```
+
+**Step 5. Install the libraries.** This needs an internet connection and takes a few minutes.
+
+```
+pip install -r requirements.txt
+```
+
+**Step 6. Check the setup.** It should report nothing missing. If it prints a `pip` command, run that command, then run this step again.
+
+```
+python src/check_setup.py
+```
+
+**Step 7. Run the tests.** All of them should pass.
+
+```
+python -m pytest tests -q
+```
+
+**Step 8. Run the pipeline.** This downloads the data from Kaggle (no account needed), cleans it, trains and compares the models, and draws the graphs. It needs an internet connection. Choose one of the two ways. Both give the same results.
+
+Way A, one command:
+
+```
+dvc repro
+```
+
+Way B, six commands, one after the other:
 
 ```
 python -m src.ingest
@@ -104,9 +157,31 @@ python -m src.compare
 python -m src.plots
 ```
 
-   Or run `dvc repro` instead, after the one-time steps in [Reproduce with DVC](#reproduce-with-dvc).
-5. Approve the model. `predict` and `serve` refuse to use a model without a sign-off, so a named person runs `python -m src.approve --name "..." --role "..." --decision approved --reason "..."` (see [Approval gate and model card](#approval-gate-and-model-card)).
-6. Score the new patients with `python -m src.predict`, then write the answers report with `python -m src.answers_evidence`.
+**Step 9. Approve the model.** The prediction commands refuse to run until a named person has signed off. Replace the four values with the real person's details. This writes `approvals/signoff.json`.
+
+```
+python -m src.approve --name "Jane Smith" --role "Clinical owner" --decision approved --reason "Reviewed the model card and test results"
+```
+
+**Step 10. Predict on the new patients.** This scores the patients held back at the start and writes the predictions file.
+
+```
+python -m src.predict
+```
+
+**Step 11. Write the answers report.** This collects the evidence from every earlier step into one report.
+
+```
+python -m src.answers_evidence
+```
+
+If Way A was used in step 8, run this instead. It forces the report to refresh now that the sign-off and predictions exist:
+
+```
+dvc repro --force answers_evidence
+```
+
+**Step 12. Check the results.** Reports are written to the `reports` folder. Compare the run against the reference figures below.
 
 The random seed and every setting live in `config.yaml`, and models run on one thread, so the same data, settings and library versions give the same numbers. You can check your run against these figures from the reference run:
 
@@ -127,7 +202,7 @@ Small differences in the third decimal can appear if library versions differ. `r
 - `file` reads `data.raw_path`.
 - `url` downloads `data.raw_url` (http or https only) into `data.raw_path`, then reads that copy. Everything after ingest, including DVC and MLflow, still sees one raw file in one place.
 
-With `kaggle`, ingest downloads `data.kaggle_file` from the Kaggle dataset `data.kaggle_dataset` into `data.raw_path` with the `kagglehub` package (`pip install kagglehub`), so the CSV no longer has to be downloaded by hand. The file is copied byte for byte, so the fingerprint matches the hand-downloaded CSV. Kaggle may ask for credentials the first time (see the kagglehub documentation).
+With `kaggle`, ingest downloads `data.kaggle_file` from the Kaggle dataset `data.kaggle_dataset` into `data.raw_path` with the `kagglehub` package (`pip install kagglehub`), so the CSV no longer has to be downloaded by hand. The file is copied byte for byte, so the fingerprint matches the hand-downloaded CSV. No Kaggle login is needed for this public dataset. If a different dataset asks for credentials, set `KAGGLE_USERNAME` and `KAGGLE_KEY` (see the kagglehub documentation) and never commit them.
 
 A url download waits `download_timeout` seconds per attempt and tries up to `download_retries` times, pausing a little longer after each failure. It is written to a temporary name first, so a failed or half finished download never replaces a good copy. If every attempt fails, ingest stops with a message that names the address and the last error. An empty or header-only file also stops the run.
 
@@ -135,9 +210,9 @@ Each run prints the source type, the location, the time and a short fingerprint 
 
 ## Getting the raw data
 
-The raw dataset isn't in this repository. Git ignores it and DVC tracks it, and there is no DVC remote, so a fresh clone has no copy. It comes from Kaggle: [Clinical Dataset](https://www.kaggle.com/datasets/uom190346a/synthetic-clinical-tabular-dataset), described there as a clinical dataset mimicking real-world patient records. The data is synthetic.
+The raw dataset isn't in this repository. Git ignores it and DVC tracks it, and there is no DVC remote, so a fresh clone has no copy. Ingest downloads it from Kaggle by default (`data.source: kaggle`), so `python -m src.ingest` is all a fresh clone needs. To fetch it by hand instead, set `data.source: file` and follow the steps below. The data comes from Kaggle: [Clinical Dataset](https://www.kaggle.com/datasets/uom190346a/synthetic-clinical-tabular-dataset), described there as a clinical dataset mimicking real-world patient records. The data is synthetic.
 
-1. Download the CSV from the Kaggle page. Kaggle needs a free account.
+1. Download the CSV from the Kaggle page. A manual download needs a free Kaggle account.
 2. Save it as `data/raw/synthetic_clinical_dataset.csv`. Rename it if the downloaded file has a different name.
 3. Run `python -m src.ingest`, then the other stages in the table above.
 
@@ -149,7 +224,7 @@ The settings you're most likely to touch:
 
 ```
 data:
-  source: file                           # file, url (download raw_url first) or kaggle (download from Kaggle first)
+  source: kaggle                         # kaggle (default), file, or url (download raw_url first)
   raw_path: data/raw/synthetic_clinical_dataset.csv   # the raw file (a url download is saved here)
   raw_url: null                          # http or https address, used when source is url
   kaggle_dataset: uom190346a/synthetic-clinical-tabular-dataset   # owner/name, used when source is kaggle
@@ -324,7 +399,11 @@ Tracking is optional. Set `tracking.enabled: false` in `config.yaml`, or leave `
 
 ## Reproduce with DVC
 
-`dvc.yaml` describes seven stages: ingest, validate, train, evaluate, compare, plots and answers_evidence. DVC needs a Git repository to start, so run `git init` first. With DVC installed, from the project root:
+`dvc.yaml` describes seven stages: ingest, validate, train, evaluate, compare, plots and answers_evidence.
+
+On a fresh clone, skip the commands below. The DVC files are already in the repository, so run `dvc repro`.
+
+To set DVC up in a new folder that isn't a clone, DVC needs a Git repository, so run `git init` first. With DVC installed, from the project root:
 
 ```
 git init

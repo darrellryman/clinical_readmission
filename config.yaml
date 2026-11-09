@@ -261,7 +261,7 @@ approval:
     that differs from the synthetic training data.
   known_limits:
     - The data is synthetic, so the scores say nothing about real patients.
-    - Signal is weak. About three in four flagged patients are not readmitted.
+    - Signal is weak. About four in five flagged patients are not readmitted.
     - No date or site column, so a time-based or site-based check was not possible.
     - Fairness was checked by sex and age band only. No ethnicity or Indigenous status data exists.
     - Patients outside the age range 18 to 100 were removed, so the model says nothing about children.
