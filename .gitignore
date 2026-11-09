@@ -32,7 +32,6 @@ data/raw/*
 artifacts/*
 !artifacts/.gitkeep
 # The architecture diagram is documentation, not a training output, so Git keeps it.
-!artifacts/Pipeline_Architecture_Diagram.pptx
 !artifacts/Pipeline_Architecture_Diagram.jpg
 reports/*
 !reports/.gitkeep

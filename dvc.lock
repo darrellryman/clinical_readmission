@@ -38,7 +38,7 @@ stages:
       size: 526919
     - path: reports/ingest_output.rtf
       hash: md5
-      md5: 8f2a496ae40d04cb177a040e1314021d
+      md5: e0e511e6949d0e71ed8feb2751537cff
       size: 12440
   validate:
     cmd: python -m src.validate
@@ -118,7 +118,7 @@ stages:
       size: 6672
     - path: artifacts/model_card.json
       hash: md5
-      md5: ce287b7d5ab48e135cfa2abc8b96a444
+      md5: 3a77ba9707c83c59ae4f6200e0a624b5
       size: 2022
     - path: data/processed/features.csv
       hash: md5
@@ -126,7 +126,7 @@ stages:
       size: 507650
     - path: reports/train_output.rtf
       hash: md5
-      md5: 4a2626684c3e95a8a54dacb8e20e01bc
+      md5: abb02cd7a514472357e74f256a02f357
       size: 3078
   evaluate:
     cmd: python -m src.evaluate
@@ -234,7 +234,7 @@ stages:
     outs:
     - path: reports/compare_output.rtf
       hash: md5
-      md5: 6f290b63b64b7626e4be5e965ee87d94
+      md5: 878055d5345538c7268340ce5a92c43e
       size: 4877
     - path: reports/evaluation_evidence.md
       hash: md5
@@ -303,7 +303,7 @@ stages:
       nfiles: 4
     - path: reports/plots_output.rtf
       hash: md5
-      md5: a3eeb47c57555ef26dfae41d572842a1
+      md5: dbdd1476c02311d2f76e177a6f2afb2c
       size: 484868
   answers_evidence:
     cmd: python -m src.answers_evidence
@@ -314,7 +314,7 @@ stages:
       size: 6672
     - path: artifacts/model_card.json
       hash: md5
-      md5: ce287b7d5ab48e135cfa2abc8b96a444
+      md5: 3a77ba9707c83c59ae4f6200e0a624b5
       size: 2022
     - path: config.yaml
       hash: md5
@@ -339,8 +339,8 @@ stages:
       size: 383
     - path: src/answers_evidence.py
       hash: md5
-      md5: f8b401676675a563f24a75afbac3df04
-      size: 99717
+      md5: 6634f5f18271a06fa124feeb1617f46a
+      size: 107169
     - path: src/config.py
       hash: md5
       md5: 641e6c5fe9c9ac9ec463183e32371e46
@@ -376,5 +376,5 @@ stages:
     outs:
     - path: reports/answer_evidence_output.rtf
       hash: md5
-      md5: 12ed207d5a959205999a466ea7fb6e12
-      size: 1212178
+      md5: 9fd32ea1609fee62451492b3d6bda6c0
+      size: 1218196

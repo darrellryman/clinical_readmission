@@ -10,7 +10,7 @@
 
     Reports what is installed for the pipeline and prints one pip command for
     whatever is missing. Run it from inside the activated virtual environment:
-        python check_setup.py
+        python src/check_setup.py
 """
 
 import importlib.metadata as objMeta

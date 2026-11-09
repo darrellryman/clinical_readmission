@@ -102,3 +102,25 @@ def test_diagram_evidence_without_png(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(answers_evidence, "STR_DIAGRAM_FILE", str(tmp_path / "none.png"))
     answers_evidence.subPrintDiagramEvidence()
     assert "Export the slide as a JPEG" in capsys.readouterr().out
+
+
+def test_suitability_evidence_prints_the_four_facts(dctConfig, tmp_path, capsys):
+    import json
+    from src.answers_evidence import subPrintSuitabilityEvidence
+    pthCard = tmp_path / "card.json"
+    pthCard.write_text(json.dumps({
+        "training_rows": 7356, "training_positive_rate": 0.1404, "parameters": {"class_weight": "balanced"},
+        "gate": {"enabled": True, "auc_gain": 0.106, "required_gain": 0.05, "passed": True}}), encoding="utf-8")
+    dctConfig["approval"]["model_card_path"] = str(pthCard)
+    dctConfig["approval"]["signoff_path"] = str(tmp_path / "none.json")
+    subPrintSuitabilityEvidence(dctConfig)
+    strOut = capsys.readouterr().out
+    assert "14.0%" in strOut and "balanced" in strOut and "7356" in strOut
+    assert "PASSED" in strOut and "none recorded yet" in strOut
+
+
+def test_suitability_evidence_without_card(dctConfig, tmp_path, capsys):
+    from src.answers_evidence import subPrintSuitabilityEvidence
+    dctConfig["approval"]["model_card_path"] = str(tmp_path / "missing.json")
+    subPrintSuitabilityEvidence(dctConfig)
+    assert "Run python -m src.train first" in capsys.readouterr().out

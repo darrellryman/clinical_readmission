@@ -60,7 +60,7 @@ from src.config import subAddConfigArgument, dctLoadConfig
 from src.display import (objCaptureToRtf, subPrintStep, subPrintPiplineHeader, bDisplayDatasetDetails, subPrintImage,
                          STR_BOLD, STR_UNDERLINE, STR_RESET, STR_ITALIC)
 from src.evaluate import dctComputeMetrics, dfBuildGroups, dfConfusionCounts, dfMetricsByGroup
-from src.features import tplBuildFeatures, lstSplitData, dfRawInputs
+from src.features import tplBuildFeatures, lstSplitData, dfRawInputs, dfEngineerFeatures
 from src.ingest import dfLoadCsv, dfKeepColumns, dfCleanData, dfFilterAllowedValues, dfFilterValueRange
 from src.tracking import strFileFingerprint, strGitCommit
 from src.train import arrCrossValScores, mdlBuildModel, mdlLoadModel
@@ -173,7 +173,7 @@ def subPrintMetricChoiceEvidence(dctConfig: dict, serY: pd.Series, serYTest: pd.
 
     # A model that predicts "no readmission" for everyone is right whenever the patient was not readmitted.
     fltAlwaysNo = float((serYTest != varPositive).mean())
-    # A do-nothing model gives every patient the same score, so it can't rank anyone: AUC 0.5.
+    # A do-nothing model gives every patient the same score, so it can not rank anyone: AUC 0.5.
     fltBaselineAuc = float(roc_auc_score(serYTest, np.zeros(len(serYTest))))
 
     print(f"\n{STR_BOLD}{STR_UNDERLINE}Metric choice evidence{STR_RESET}")
@@ -762,6 +762,67 @@ def subPrintFeatureSignalEvidence(dctConfig: dict) -> None:
         print(f"\n  {strColumn:<16} {fltAuc:.3f}   ({fltFromChance:.3f} from chance)")
 
 
+def subPrintSameFeaturesEvidence(dctConfig: dict, intPatients: int = 5) -> None:
+    """Show that predicting through the saved pipeline gives the same scores as building the features by hand.
+
+    The first new patients are scored two ways. Route 1 gives the raw columns to the
+    saved pipeline, as predict.py does. Route 2 builds the features with
+    dfEngineerFeatures and scores them with the pipeline's own model step. If the
+    probabilities match exactly, prediction uses the same feature logic as training.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses data.new_data_path and model.path.
+        intPatients: How many new patients to show.
+
+    Returns:
+        None. It only prints.
+    """
+    dfNew = dfRawInputs(dfLoadCsv(dctConfig["data"]["new_data_path"]), dctConfig).head(intPatients)
+    mdlPipeline = mdlLoadModel(dctConfig["model"]["path"])
+    intPositive = list(mdlPipeline.classes_).index(dctConfig["evaluation"]["positive_label"])
+
+    arrPipeline = mdlPipeline.predict_proba(dfNew)[:, intPositive]
+    dfFeatures = dfEngineerFeatures(dfNew, dctConfig)
+    arrByHand = mdlPipeline.named_steps["model"].predict_proba(dfFeatures)[:, intPositive]
+
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Same feature logic in prediction{STR_RESET}")
+    print(f"\n{STR_BOLD}Pipeline steps:{STR_RESET} {', '.join(mdlPipeline.named_steps)}")
+    print(f"\n{STR_BOLD}Raw columns given to predict:{STR_RESET} {', '.join(dfNew.columns)}")
+    print(f"\n{STR_BOLD}Columns the model scores:{STR_RESET} {', '.join(dfFeatures.columns)}")
+    print(f"\n{STR_BOLD}Probability of readmission for the first {len(dfNew)} new patients{STR_RESET}")
+    print(pd.DataFrame({"saved pipeline": arrPipeline, "features built by hand": arrByHand}).round(4).to_string())
+    print(f"\n{STR_BOLD}Identical:{STR_RESET} {bool(np.array_equal(arrPipeline, arrByHand))}")
+
+
+def subPrintPredictionsEvidence(dctConfig: dict, intRows: int = 5) -> None:
+    """Print the file predict.py writes, to show the script produces predictions for new patients.
+
+    Args:
+        dctConfig: The loaded config.yaml settings. Uses outputs.predictions_path
+            and outputs.prediction_column.
+        intRows: How many patients to show.
+
+    Returns:
+        None. It only prints. If the file does not exist it says so.
+    """
+    pthPredictions = Path(dctConfig["outputs"]["predictions_path"])
+    print(f"\n{STR_BOLD}{STR_UNDERLINE}Predictions written by predict.py{STR_RESET}")
+    if not pthPredictions.is_file():
+        print(f"\nNo predictions file at {pthPredictions}. Run python -m src.predict first.")
+        return
+
+    dfPredictions = pd.read_csv(pthPredictions)
+    strColumn = dctConfig["outputs"]["prediction_column"]
+    intFlagged = int((dfPredictions[strColumn] == dctConfig["evaluation"]["positive_label"]).sum())
+    print(f"\n{STR_BOLD}File:{STR_RESET} {pthPredictions}")
+    print(f"\n{STR_BOLD}New patients scored:{STR_RESET} {len(dfPredictions)}, of whom {intFlagged} were flagged as likely readmissions.")
+    print(f"\n{STR_BOLD}First {intRows} rows ({strColumn} is the last column){STR_RESET}")
+    print(dfPredictions.head(intRows).to_string(index=False))
+
+
+
+
+
 
 
 
@@ -810,7 +871,7 @@ def subAnswerIngest(dctConfig: dict) -> None:
     # The profile above is the evidence for the raw data and where it came from.
     subPrintStep(
         f"\n{STR_BOLD}Step 1 - {STR_RESET}{STR_ITALIC}Pipeline architecture diagram: describe the raw data and its source.{STR_RESET}",
-        "The raw data is stored in one CSV file called synthetic_clinical_dataset.csv, which is defined in the config in data.raw_path. The data includes 10,000 rows (one per patient) and 14 columns in total. Six columns are integers, six are decimals, and two are text (sex and diagnosis). The data profile shows no missing values and no duplicate rows. The input variables for the tool are age, sex, BMI, systolic and diastolic blood pressure, glucose, cholesterol, creatinine, diabetes and hypertension. Diagnosis is a text column that stays in the cleaned file but is not used as an input. The target variable is readmission_30d, indicating an average of about 14% of patients were readmitted within 30 days. Mortality is a competing endpoint and would leak information if used as an input variable. The patient_id variable is a label and thus not used as an input variable. The data profile also reveals a problem that will surface later. Age has a minimum value of 0, meaning some records must be for newborns or children. The tool is designed to work with adult inpatients and thus the ingest filters on age.",
+        "The raw data is stored in one CSV file called synthetic_clinical_dataset.csv, which is defined in the config in data.raw_path. The data includes 10,000 rows (one per patient) and 14 columns in total. Six columns are integers, six are decimals, and two are text (sex and diagnosis). The data profile shows no missing values and no duplicate rows. The input variables for the tool are age, sex, bmi, systolic and diastolic blood pressure, glucose, cholesterol, creatinine, diabetes and hypertension. Diagnosis is a text column that stays in the cleaned file but is not used as an input. The target variable is readmission_30d, indicating an average of about 14% of patients were readmitted within 30 days. Mortality is a competing endpoint and would leak information if used as an input variable. The patient_id variable is a label and thus not used as an input variable. The data profile also reveals a problem that will surface later. Age has a minimum value of 0, meaning some records must be for newborns or children. The tool is designed to work with adult inpatients and thus the ingest filters on age.",
     )
 
     # dfLoadCsv above loads the raw data from the path in config.yaml, the same way every run.
@@ -828,13 +889,13 @@ def subAnswerIngest(dctConfig: dict) -> None:
     # The raw data above is where data authority starts. Say who owns this data and whose consultation would be needed.
     subPrintStep(
         f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Consider cultural safety, data authority and the need for consultation where the data, prediction or proposed use could affect Aboriginal and Torres Strait Islander peoples, communities, Country or knowledge.{STR_RESET}",
-        "The dataset lacks a column (or combination of columns) that allows identification of Indigenous people. Therefore, it is not possible to evaluate how the model is treating Aboriginal and Torres Strait Islander patients. The dataset would need to include data so performance can be reported for First Nations patients, and any use would need to demonstrate a collective benefit for that community/communities. Regarding authority to control use of the data, this would sit with the relevant Aboriginal community and their health service (e.g., an Aboriginal Community Controlled Health Organisation), as well as the hospital’s data governance and an ethics committee with appropriate Aboriginal representation.",
+        "The dataset lacks a column (or combination of columns) that allows identification of Indigenous people. It is not possible to evaluate how the model is treating Aboriginal and Torres Strait Islander patients. The dataset would need to include data so performance can be reported for First Nations patients, and any use would need to demonstrate a collective benefit for that community/communities. Regarding authority to control use of the data, this would sit with the relevant Aboriginal community and their health service (e.g., an Aboriginal Community Controlled Health Organisation), as well as the hospital’s data governance and an ethics committee with appropriate Aboriginal representation.",
     )
 
     # The dataset is synthetic and has no ethnicity or Indigenous status column. Say what a real setting would add.
     subPrintStep(
         f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Where cultural safety issues are not directly evident in the selected dataset, explain what would still need to be considered before applying the system in a real organisational or community setting.{STR_RESET}",
-        "Although there are no issues with cultural safety identified in this data, a real hospital would record a patient’s self-identified Indigenous status, enabling the model to be checked for Aboriginal and Torres Strait Islander patients. The organisation would also need to consult with and obtain approval from the local Aboriginal community and their health service on how the data will be collected, stored, and used. Patients and staff must be informed that the model exists, how individuals will be flagged, and who can overturn a patient's flagging, with follow-up actions that are culturally safe (e.g. involving Aboriginal health workers). I would also like to set up a review after the system goes live to identify whether any groups have been under-flagged by the model, and to inform the community and organisation so they can take appropriate action where required.",
+        "Although there are no issues with cultural safety identified in this data, a real hospital would record a patient’s self-identified Indigenous status, enabling the model to be checked for Aboriginal and Torres Strait Islander patients. The organisation would also need to consult with and obtain approval from the local Aboriginal community and their health service on how the data will be collected, stored, and used. Patients and staff must be informed that the model exists, how individuals will be flagged, and who can overturn a patient's flagging, with follow-up actions that are culturally safe (e.g. involving Aboriginal health workers). A review should be set up after the system goes live to identify whether any groups have been under-flagged by the model, and to inform the community and organisation so they can take appropriate action where required.",
     )
 
     # Section 1, step 1. The purpose of the system. This sits below the row counts above
@@ -865,7 +926,7 @@ def subAnswerIngest(dctConfig: dict) -> None:
     # The answer to the who-uses question above, widened to everyone the system touches.
     subPrintStep(
         f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Identify the users, affected stakeholders and people or communities who could benefit from or be harmed by the system.{STR_RESET}",
-        "Patients identified as high risk for readmission can benefit from a flag that prompts follow-up that would otherwise be missed. Clinicians can benefit from a consistent prompt to support their clinical judgement. The hospital can benefit from fewer avoidable readmissions and improved bed management through reduced length of stay. However, some patient groups also face potential harm. Patients the model does not identify as at risk may receive less appropriate care than others with similar needs if clinicians rely on the flag. Similarly, patients who are incorrectly flagged as being at risk and undergo additional contact as a result could experience significant anxiety for no reason. This model does not cover children. The ingest summary for this model shows that 204 rows outside of the age range of (18 to 100) were removed. In this data, these are the under-18s, so the model says nothing about them and must not be applied to them. The summary also shows that 116 rows outside of the allowed values for sex (Female, Male) were removed. In this data, these are patients whose sex is recorded as Other. There were too few of them to score fairly, and the model only knows two categories, so the model says nothing about them either and must not be applied to them. Removing them also means any bias against this group could not be detected. Older patients may also be served least well, because small groups give very unreliable scores. The dataset for this model does not have columns for ethnicity or Indigenous status. Therefore, Aboriginal and Torres Strait Islander peoples and other ethnic communities will not be able to determine whether or not they are receiving different treatment as a result of this model. People in rural and remote areas may also be disadvantaged, as follow-up services and other services required for the model's output may be difficult to access in these locations. Any use of this model would require consultation with the communities of concern and a clear data owner before the model can access patients' health information.",
+        "Patients identified as high risk for readmission can benefit from a flag that prompts follow-up that would otherwise be missed. Clinicians can benefit from a consistent prompt to support their clinical judgement. The hospital can benefit from fewer avoidable readmissions and improved bed management through reduced length of stay. However, some patient groups also face potential harm. Patients the model does not identify as at risk may receive less appropriate care than others with similar needs if clinicians rely on the flag. Similarly, patients who are incorrectly flagged as being at risk and undergo additional contact as a result could experience significant anxiety for no reason. This model does not cover children. The ingest summary for this model shows that 204 rows outside of the age range of (18 to 100) were removed. In this data, these are the under-18s, so the model says nothing about them and must not be applied to them. The summary also shows that 116 rows outside of the allowed values for sex (Female, Male) were removed. In this data, these are patients whose sex is recorded as Other. There were too few of them to score fairly, and the model only knows two categories, so the model says nothing about them either and must not be applied to them. Removing them also means any bias against this group could not be detected. Older patients may also be served least well, because small groups give very unreliable scores. The dataset for this model does not have columns for ethnicity or Indigenous status. Aboriginal and Torres Strait Islander peoples and other ethnic communities will not be able to determine whether or not they are receiving different treatment as a result of this model. People in rural and remote areas may also be disadvantaged, as follow-up services and other services required for the model's output may be difficult to access in these locations. Any use of this model would require consultation with the communities of concern and a clear data owner before the model can access patients' health information.",
     )
 
     # The row counts above are the evidence for what ingestion did.
@@ -880,7 +941,7 @@ def subAnswerIngest(dctConfig: dict) -> None:
         "The Ingest stage of the pipeline removes invalid rows and reports how many. Spaces are stripped from string columns, duplicates are removed, and rows are removed where the sex is not Female or Male (116) and outside the age range of 18 to 100 (204), and the counts are printed above. The raw data had no missing values. The pipeline never fills in gaps or ‘guesses’ values in any of the stages. The Validate stage checks the file after cleaning and stops the pipeline if there are any problems with the cleaned data. The Validate stage stops at once if the table is empty or a required column is missing. Otherwise it runs the remaining checks together and reports every problem in one message: too few rows, missing values in a required column, a value outside the allowed list for sex, an age outside the range, duplicate rows, and a target that is not 0 or 1. The feature stage also refuses any category that is not on the config list, so bad data is stopped as early as possible before it causes problems later in the pipeline.",
     )
 
-    # The cleaned profile above shows what the data does and doesn't hold. Think about synthetic values, clipped ranges and 0 ages.
+    # The cleaned profile above shows what the data does and does not hold. Think about synthetic values, clipped ranges and 0 ages.
     subPrintStep(
         f"\n{STR_BOLD}Step 6 - {STR_RESET}{STR_ITALIC}Discuss limitations in the data, features, model and evaluation (the data).{STR_RESET}",
         "There are no date or site columns, so data cannot be split into training and test data for different times or sites. A random split of the data will likely overstate how well the model works in practice. There are no columns for Indigenous status or ethnicity, so fairness can only be assessed by sex and age. The average readmission rate is about 14%. Due to this strongly imbalanced class distribution, the results must be interpreted with caution.",
@@ -909,25 +970,25 @@ def subAnswerValidate(dctConfig: dict, strInputPath: str) -> None:
     # the quotes on the second line. Use triple quotes if it runs over several lines.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe data validation.",
-        "Step 2 - Add checks for relevant data-quality problems, such as: missing or unexpected columns; incorrect data types; missing values; invalid value ranges; duplicate rows; categories outside an expected set; date or time values that cannot be parsed.",
+        "The Validation stage is run by validate.py on the cleaned data before any features are created. It runs 11 checks including required columns, unexpected columns, missing values, data types, allowed categories, value ranges, duplicates, and a 0/1 target. For each one, it prints a line saying PASS or FAIL. A failed check raises an error that stops the pipeline. This error check is repeated for training, evaluation, comparison and the plots.",
     )
 
     # The rules in dfValidate ran above. Say which of these problems each rule covers and which it does not.
     subPrintStep(
         "Step 2 - Add checks for relevant data-quality problems, such as: missing or unexpected columns; incorrect data types; missing values; invalid value ranges; duplicate rows; categories outside an expected set; date or time values that cannot be parsed.",
-        "The checks test for unexpected columns, missing and wrong data types, missing values, out of range values, duplicate rows and values that are not in the allowed categories. Check 2 fails the run if a feature column or the target column is missing. Check 9 fails any column that ingest does not keep. Check 10 checks if all numeric feature columns only hold numbers. Check 4 counts missing values. Check 6 checks the values for the column “age” against 18 to 100. Check 11 checks the values for the columns “BMI”, “blood_pressure”, “glucose”, “cholesterol” and “creatinine” against the limits in the config file. Check 5 tests the values for the column “sex” against the allowed list of values. Check 7 counts the number of duplicate rows. Check 8 fails if the target column is not 0 or 1. There are no date or time columns in the dataset.",
+        "The checks test for unexpected columns, missing and wrong data types, missing values, out of range values, duplicate rows and values that are not in the allowed categories. Check 2 fails the run if a feature column or the target column is missing. Check 9 fails any column that ingest does not keep. Check 10 checks if all numeric feature columns only hold numbers. Check 4 counts missing values. Check 6 checks the values for the column “age” against 18 to 100. Check 11 checks the values for the columns “bmi”, “systolic_bp”, “diastolic_bp”, “glucose”, “cholesterol” and “creatinine” against the limits in the config file. Check 5 tests the values for the column “sex” against the allowed list of values. Check 7 counts the number of duplicate rows. Check 8 fails if the target column is not 0 or 1. There are no date or time columns in the dataset.",
     )
 
     # Validation is one automated check. The pytest tests and the CI workflow are the others.
     subPrintStep(
         "Step 5 - Add automated quality checks through tests, validation scripts, continuous integration workflows or another justified approach.",
-        "Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 175 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file, so be careful when editing config.yaml as you may break the tests. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.",
+        "Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 208 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.",
     )
 
     # Describe .github/workflows/ci.yml: when it runs and what it runs.
     subPrintStep(
         "Step 5 - Where appropriate, configure a workflow such as GitHub Actions to run selected checks automatically.",
-        "A GitHub Actions workflow (.github/workflows/ci.yml) runs all the tests automatically on a clean GitHub-hosted machine (separate from my dev box). The workflow installs all required libraries from requirements.txt and then runs python -m pytest tests. All failing test cases of the executed test suite will then turn the complete run red on the Actions tab. Note that this workflow only runs tests and does not run the full pipeline. DVC manages the raw data, and thus it is not stored in Git.",
+        "A GitHub Actions workflow (.github/workflows/ci.yml) runs all the tests automatically on a clean GitHub-hosted machine (separate from the development computer). The workflow installs all required libraries from requirements.txt and then runs python -m pytest tests. All failing test cases of the executed test suite will then turn the complete run red on the Actions tab. This workflow only runs tests and does not run the full pipeline. DVC manages the raw data, and thus it is not stored in Git.",
     )
 
     # The validation rules above stop the run when the data changes shape. Say what happens next and who is told.
@@ -975,13 +1036,13 @@ def subAnswerTrain(dctConfig: dict, strInputPath: str) -> None:
     # dfX holds the inputs the model sees. Check each one is known at the prediction time.
     subPrintStep(
         "Step 1 - Identify which inputs would genuinely be available at the prediction time. Information that becomes available only afterwards cannot legitimately be used as a feature.",
-        "The following 10 input variables are measured before a patient’s discharge and can be used for prediction: age, sex, BMI, systolic and diastolic blood pressure, glucose, cholesterol, creatinine, diabetes, and hypertension. Note that the mortality variable is not used in the model, as it is measured only after discharge and would otherwise leak part of the outcome into the data used for prediction. The Patient ID variable is a label and is not used as an input variable; it is also not included in the cleaned data file, whereas the diagnosis variable is included in the cleaned data file but not used as an input variable in the model. All columns that are excluded from the model are listed in the config file and in the config check to prevent them from being added as input variables.",
+        "The following 10 input variables are measured before a patient’s discharge and can be used for prediction: age, sex, BMI, systolic and diastolic blood pressure, glucose, cholesterol, creatinine, diabetes, and hypertension. The mortality variable is not used in the model, as it is measured only after discharge and would otherwise leak part of the outcome into the data used for prediction. The Patient ID variable is a label and is not used as an input variable; it is also not included in the cleaned data file, whereas the diagnosis variable is included in the cleaned data file but not used as an input variable in the model. All columns that are excluded from the model are listed in the config file and in the config check to prevent them from being added as input variables.",
     )
 
     # dfEngineerFeatures built the extra columns inside tplBuildFeatures above.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe feature engineering and preprocessing.",
-        "Feature engineering sits in features.py. The function creates two features. The first is pulse_pressure, the difference between systolic and diastolic blood pressure. The second is sex_Male, which converts sex to a 0/1 feature where males are 1 and females are 0. The config, not the data, determines the sex categories. Therefore, any values not in the category list will end the run rather than be scored against the first category. The function does not learn anything from the data (i.e., no scaling, no averaging, etc.), so it is safe to use on the training data, the test data, and new patients. ",
+        "Feature engineering sits in features.py. The function creates two features. The first is pulse_pressure, the difference between systolic and diastolic blood pressure. The second is sex_Male, which converts sex to a 0/1 feature where males are 1 and females are 0. The config determines the sex categories, so any values not in the category list will end the run rather than be scored against the first category. The function does not learn anything from the data (i.e., no scaling, no averaging, etc.), so it is safe to use on the training data, the test data, and new patients. ",
     )
 
     # dfEngineerFeatures built pulse_pressure and sex_Male inside tplBuildFeatures above.
@@ -1027,14 +1088,14 @@ def subAnswerTrain(dctConfig: dict, strInputPath: str) -> None:
     # The model file above is an artefact. Say how it and the data are versioned (dvc.yaml).
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe versioning and experiment or artefact tracking.",
-        "Git versions the code, config.yaml, dvc.yaml and requirements.txt. DVC versions the raw data using a small pointer file and tracks the outputs of each stage (model, model card, metrics and reports) by storing their hashes in dvc.lock. MLflow tracks the runs for training, evaluation and comparison with relevant parameters, scores and saved files. Every run is tagged with the Git commit and fingerprints of the data and config. The model card carries the same fingerprints, so you can see what was used to build a given model.",
+        "Git versions the code, config.yaml, dvc.yaml and requirements.txt. DVC versions the raw data using a small pointer file and tracks the outputs of each stage (model, model card, metrics and reports) by storing their hashes in dvc.lock. MLflow tracks the runs for training, evaluation and comparison with relevant parameters, scores and saved files. Every run is tagged with the Git commit and fingerprints of the data and config. The model card carries the same fingerprints, so a team member can see what was used to build a given model.",
     )
 
     print(f"\n{STR_BOLD}Required gain:{STR_RESET} {dctConfig['approval']['min_auc_gain']:.3f}")
     # The saved model file above is the evidence. Say whether the model is approved before use.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe model saving or approval.",
-        "A model is only saved if it passes the approval gate in train.py. The cross-validated AUC on the training rows needs to be at least 0.050 above the baseline AUC. A model that fails isn’t saved and the stage stops with an error. A model that passes the test is saved as model.joblib along with a model card (model_card.json). Additionally, a named person must still approve it before any real use. Passing the gate is an automated check, not clinical approval.",
+        "A model is only saved if it passes the approval gate in train.py. The cross-validated AUC on the training rows needs to be at least 0.050 above the baseline AUC. A model that fails isn’t saved and the stage stops with an error. A model that passes the test is saved as model.joblib along with a model card (model_card.json). Also, a named person must still approve it before any real use. Passing the gate is an automated check, not clinical approval.",
     )
 
     print(f"\n{STR_BOLD}{STR_UNDERLINE}Git history{STR_RESET}")
@@ -1045,7 +1106,7 @@ def subAnswerTrain(dctConfig: dict, strInputPath: str) -> None:
     except (OSError, subprocess.SubprocessError):
         strLog = ""
 
-    print(strLog or "No Git history found. Git isn't installed, or this folder isn't a Git repository.")
+    print(strLog or "No Git history found. Git is not installed, or this folder is not a Git repository.")
 
     # No code produces this evidence. It lives in the Git history, so describe your commits here.
     subPrintStep(
@@ -1147,7 +1208,7 @@ def subAnswerEvaluate(dctConfig: dict, strInputPath: str) -> None:
     # The error counts above give the numbers. Say what a missed readmission costs and what a false alarm costs.
     subPrintStep(
         "Step 6 - Explain the consequences of false positives, false negatives or other important model failures in the context of the selected task.",
-        "A false negative is a readmitted patient the model missed, so the patient leaves without the extra monitoring that might have prevented their return. The model missed 99 of the 258 readmissions in the test rows. A false positive is a flagged patient who was not readmitted, which means unnecessary monitoring and clinician time. There were 552 of these, so about 78 percent of flagged patients were false alarms. Assuming extra follow-up is of low risk, we trade off recall against precision. However, many false alarms would likely swamp a clinical team, and we would not wish a model to override a clinician’s decision given the weak signal in this case.",
+        "A false negative is a readmitted patient the model missed, so the patient leaves without the extra monitoring that might have prevented their return. The model missed 99 of the 258 readmissions in the test rows. A false positive is a flagged patient who was not readmitted, which means unnecessary monitoring and clinician time. There were 552 of these, so about 78 percent of flagged patients were false alarms. Recall is traded against precision on the assumption that follow-up is low risk. However, many false alarms would likely swamp a clinical team, so the model should not override a clinician’s decision given the weak signal in this case.",
     )
 
     subPrintMetricChoiceEvidence(dctConfig, serY, serYTest, dctMetrics)
@@ -1155,7 +1216,7 @@ def subAnswerEvaluate(dctConfig: dict, strInputPath: str) -> None:
     # The metrics above are the evidence. Say why recall, precision and AUC suit a rare outcome.
     subPrintStep(
         "Step 3 - Evaluate the models using at least one metric suited to the prediction task.",
-        "The primary metric of interest for this problem is ROC AUC, since our goal is to rank patients from most likely to be readmitted to least likely to be readmitted. Recall and precision are reported, since both a failure to predict a readmission and a false alarm are costly. Accuracy is reported but can be misleading, as only 14% of patients are readmitted. The implication is that a model that predicts no readmission for everyone would be correct 86% of the time. On the test set the logistic regression achieves an AUC of 0.639, with a recall of 0.616 and a precision of 0.224. The do-nothing baseline achieves an AUC of 0.500.",
+        "The primary metric of interest for this problem is ROC AUC, since the goal is to rank patients from most likely to be readmitted to least likely to be readmitted. Recall and precision are reported, since both a failure to predict a readmission and a false alarm are costly. Accuracy is reported but can be misleading, as only 14% of patients are readmitted. The implication is that a model that predicts no readmission for everyone would be correct 86% of the time. On the test set the logistic regression achieves an AUC of 0.639, with a recall of 0.616 and a precision of 0.224. The do-nothing baseline achieves an AUC of 0.500.",
     )
 
     subPrintRunHistoryEvidence(dctConfig)
@@ -1194,22 +1255,22 @@ def subAnswerCompare(dctConfig: dict) -> None:
     # the quotes on the second line. Use triple quotes if it runs over several lines.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe model evaluation and benchmarking (the baseline and candidate comparison).",
-        "The above script compares four different models on the same test data: a do-nothing model, an age 65 rule, a logistic regression, and a random forest model. To verify the differences between the models, I ran each model with 5-fold cross-validation on the training set. The results on the test set were 0.639 for the logistic regression, 0.636 for the random forest, 0.511 for the age 65 rule, and 0.500 for the do-nothing model. After running the two top-scoring models on cross-validation (0.606 for logistic regression and 0.599 for random forest), I couldn’t detect any meaningful differences between them. The folds had a variability of about 0.02. I chose the simpler model, logistic regression. The model scores are stored in model_comparison.csv, and the final recommendation is written to evidence.md.",
+        "The above script compares four different models on the same test data: a do-nothing model, an age 65 rule, a logistic regression, and a random forest model. To verify the differences between the models, each model ran with 5-fold cross-validation on the training set. The results on the test set were 0.639 for the logistic regression, 0.636 for the random forest, 0.511 for the age 65 rule, and 0.500 for the do-nothing model. After running the two top-scoring models on cross-validation (0.606 for logistic regression and 0.599 for random forest), there were no meaningful differences between them. The folds had a variability of about 0.02. A simpler model was chosen, logistic regression. The model scores are stored in model_comparison.csv, and the final recommendation is written to evaluation_evidence.md.",
     )
 
     # The whole pipeline has run by now. The diagram is the evidence, then describe it.
     subPrintDiagramEvidence()
     subPrintStep(
         "Step 1 - Create a pipeline architecture diagram showing: raw data and its source, data ingestion, data validation, feature engineering and preprocessing, model training, model evaluation and benchmarking, versioning and experiment or artefact tracking, model saving or approval, the reusable prediction workflow, and monitoring considerations.",
-        "The pipeline starts with the raw data, a synthetic CSV of 10,000 patients, and runs through ingest.py, validate.py (11 checks) and features.py, then train.py, evaluate.py, compare.py and plots.py. Git versions the code, DVC tracks the stage graph, MLflow logs the train, evaluate and compare runs, and each stage writes an RTF report. The model is saved only if its cross-validated AUC beats the baseline by at least 0.05, and a named person has to approve it with approve.py before it can score anyone. predict.py and the FastAPI service run new patients through the same validation and feature code, and monitoring is shown as a dashed box because I’ve described it but not built it.",
+        "The pipeline starts with the raw data, a synthetic CSV of 10,000 patients, and runs through ingest.py, validate.py (11 checks) and features.py, then train.py, evaluate.py, compare.py and plots.py. Git versions the code, DVC tracks the stage graph, MLflow logs the train, evaluate and compare runs, and each stage writes an RTF report. The model is saved only if its cross-validated AUC beats the baseline by at least 0.05, and a named person has to approve it with approve.py before it can score anyone. predict.py and the FastAPI service run new patients through the same validation and feature code, and monitoring is shown as a dashed box, which is described but not built.",
     )
 
 
     # Tie the answer to this task: rare readmissions, a shared feature function, config-held exclusions.
     subPrintSuitabilityEvidence(dctConfig)
     subPrintStep(
-        "Step 1 - Explain why the proposed architecture is suitable for your prediction task rather than presenting a generic machine learning pipeline.",
-        "The purpose of this pipeline is to answer one simple question for adult inpatients: Will they be readmitted within 30 days of discharge? Readmission occurs in only 14% of cases, so classes are imbalanced. As such, the model is evaluated on AUC and recall scores on the test data, computed separately by age and sex groups. The data needed cleaning, as ingest removed 320 rows (i.e. sex = “Other” or age < 18 or age > 100). The validation step here runs 11 checks before training up the model. The model is tested on a separate test data split. Note that wrong answers here can be very bad for patients, so we require the model to improve on the baseline by at least 0.05 AUC in cross-validation and then have a named person sign off on the model. Both the predict.py script and the corresponding FastAPI service scripts reuse the training code of this pipeline to process new inpatients exactly as the training data was.",
+        "Step 1 - Explain why the proposed architecture is suitable for a prediction task rather than presenting a generic machine learning pipeline.",
+        "The purpose of this pipeline is to answer one simple question for adult inpatients: Will they be readmitted within 30 days of discharge? Readmission occurs in only 14% of cases, so classes are imbalanced. As such, the model is evaluated on AUC and recall scores on the test data, computed separately by age and sex groups. The data needed cleaning, as ingest removed 320 rows (i.e. sex = “Other” or age < 18 or age > 100). The validation step here runs 11 checks before training up the model. The model is tested on a separate test data split. Wrong answers here can be very bad for patients, so the model is required to improve on the baseline by at least 0.05 AUC in cross-validation and then have a named person sign off on the model. Both the predict.py script and the corresponding FastAPI service scripts reuse the training code of this pipeline to process new inpatients exactly as the training data was.",
     )
 
 
@@ -1217,7 +1278,7 @@ def subAnswerCompare(dctConfig: dict) -> None:
     subPrintModelEvidence(dctConfig)
     subPrintStep(
         "Step 3 - Train a simple baseline model, such as a dummy classifier, dummy regressor, historical average, persistence model or existing-rule benchmark.",
-        "In compare.py,  two baselines were added: 1) a dummy classifier that always predicts “not readmitted” (since that’s the most common outcome), and 2) an existing-rule benchmark that looks at age and flags anyone over 65. The dummy classifier has an AUC of 0.500 and finds none of the readmissions (recall 0%) yet its accuracy 86% of the time. This highlights that accuracy is not a good metric for this problem. The age rule has an AUC of 0.511 and a recall of 32%, meaning age tells us little, and any real model will need to do better than this.",
+        "In compare.py,  two baselines were added: 1) a dummy classifier that always predicts “not readmitted” (since that’s the most common outcome), and 2) an existing-rule benchmark that looks at age and flags anyone over 65. The dummy classifier has an AUC of 0.500 and finds none of the readmissions (recall 0%) yet it is right 86% of the time. This highlights that accuracy is not a good metric for this problem. The age rule has an AUC of 0.511 and a recall of 32%, meaning age tells us little, and any real model will need to do better than this.",
     )
 
     # The logistic regression and random forest rows in the table above are the candidates.
@@ -1253,14 +1314,14 @@ def subAnswerCompare(dctConfig: dict) -> None:
     subPrintAucIntervalEvidence(dctConfig)
     subPrintStep(
         "Step 3 - Discuss limitations of the evaluation, including what the results do and do not establish.",
-        "These results show that the logistic regression finds some real signal on this data: it beats the baseline and the age rule, and the gap is bigger than the fold-to-fold noise. They do not show that it would work on real patients, because the data is synthetic. The test set is one split of 1,840 patients with 258 readmissions, so the AUC of 0.639 could easily be a few points either way (about 0.60 to 0.68 when I resampled the test rows). There was no date or site column, so I couldn’t test over time or across hospitals, and fairness was only checked by sex and age band, so the results say nothing about other groups, children, or whether flagging patients would actually reduce readmissions.",
+        "These results show that the logistic regression finds some real signal on this data: it beats the baseline and the age rule, and the gap is bigger than the fold-to-fold noise. They do not show that it would work on real patients, because the data is synthetic. The test set is one split of 1,840 patients with 258 readmissions, so the AUC of 0.639 could easily be a few points either way (about 0.60 to 0.68 when the test rows were resampled). There was no date or site column, so testing over time or across hospitals was not possible, and fairness was only checked by sex and age band, so the results say nothing about other groups, children, or whether flagging patients would actually reduce readmissions.",
     )
 
     # The table above is from one split of synthetic data. Say what it does and does not establish.
     subPrintFeatureSignalEvidence(dctConfig)
     subPrintStep(
         "Step 6 - Discuss limitations in the data, features, model and evaluation (the model and the evaluation).",
-        "The data is synthetic, so the scores say nothing about real patients, and with only ten patient measurements (age, sex, blood pressure, glucose and a few conditions) it leaves out the things that usually drive readmission, such as prior admissions, length of stay and diagnosis. The features are simple, and in testing age and glucose alone carried no signal. The model is a plain logistic regression that can only draw straight-line relationships, and the signal is weak: about three in four flagged patients are not readmitted. The evaluation uses a single 80/20 split, so the AUC of 0.639 could move a few points either way (roughly 0.60 to 0.68), and it cannot test over time or across hospitals because there is no date or site column, and fairness is checked by sex and age band only, with no ethnicity or Indigenous status data.",
+        "The data is synthetic, so the scores say nothing about real patients, and with only ten patient measurements (age, sex, blood pressure, glucose and a few conditions) it leaves out the things that usually drive readmission, such as prior admissions, length of stay and diagnosis. The features are simple, and in testing age and glucose alone carried no signal. The model is a plain logistic regression that can only draw straight-line relationships, and the signal is weak: about four in five flagged patients are not readmitted. The evaluation uses a single 80/20 split, so the AUC of 0.639 could move a few points either way (roughly 0.60 to 0.68), and it cannot test over time or across hospitals because there is no date or site column, and fairness is checked by sex and age band only, with no ethnicity or Indigenous status data.",
     )
 
     # The README and Git guide hold the steps. Summarise them here.
@@ -1300,43 +1361,45 @@ def subAnswerPredict(dctConfig: dict) -> None:
     # the quotes on the second line. Use triple quotes if it runs over several lines.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe the reusable prediction workflow.",
-        "",
+        "The prediction workflow does not train any models. It is a separate workflow from training, run by predict.py. The script loads the saved model, which has the feature step built in. New patients are treated exactly the same way the training data was. It checks that a named person has signed off on the model before it can score. After approval, the model scores a new patients CSV file containing only the feature columns and writes the results. It compares them with the excluded answers for the 484 new patients. serve.py runs the same model from a web form and API (using FastAPI). serve.py performs a sign-off check using the same signoff file. It rejects any patient whose fields do not match config.yaml.",
     )
 
     # What would you watch once this runs for real: input drift, the readmission rate, recall over time.
     subPrintStep(
         "Step 1 - Pipeline architecture diagram: describe monitoring considerations.",
-        "",
+        "Monitoring covers the pipeline and the model file. It doesn’t cover live performance yet. All runs of train, evaluate and compare are logged to MLflow using data and config fingerprints, and Git commit ID. A change in results is traced to what changed. The validation procedure runs 11 checks on the data before training is performed. The serve.py file has health and information endpoints. The information endpoint returns the model card. The sign-off check ensures that only approved models that have not changed since sign-off are run. Drift monitoring or tracking of real readmission outcomes against predictions is not built yet. Those would be the next addition. The plan is to compare the patients flagged each month with the actual readmitted cases. The model is retrained and reapproved if recall falls noticeably.",
     )
 
     # Think about input drift, the readmission rate, recall over time and how often validation fails.
     subPrintStep(
         "Step 6 - Explain what should be monitored if the system were used beyond the project.",
-        "",
+        "Monitoring would cover the inputs, checking for drift, and the share of patients flagged, which was about 39% in testing. Each month, flagged patients would be compared with those actually readmitted. Recall and precision by sex and age band, and staff response to the model's flagged patients, would also be tracked. A decline in these metrics would trigger a review and retraining.  A new sign-off is required if retraining happens.",
     )
 
     # python -m src.predict wrote the predictions above for the new data file.
+    subPrintPredictionsEvidence(dctConfig)
     subPrintStep(
         "Step 5 - Provide a script, command or clearly identified notebook section that can generate predictions for new data.",
-        "",
+        "Predictions are generated by the script src/predict.py and run from the project root. It scores the new patients file by default, or any CSV of feature columns passed with --input, and writes the predictions to the file named in config.yaml. If a named person has not recorded a sign-off, the script stops and prints that approval is needed. This is detailed in the README.md file.",
     )
 
     # predict.py calls the same dfEngineerFeatures as training. Show it, for example with a test or a worked row.
+    subPrintSameFeaturesEvidence(dctConfig)
     subPrintStep(
         "Step 5 - Demonstrate that the prediction workflow applies the same preprocessing and feature logic used during training.",
-        "",
+        "When saving the model, a single pipeline was saved. The first step of the saved pipeline is the feature function that was used in training, dfEngineerFeatures. predict.py only has to pass the raw feature columns to the pipeline, and the calculated and encoded features are automatically created. The lists of categories for the encoded features are fixed in config.yaml. New patients will always be processed with the same columns as the training rows. Unknown categories are treated as an error and are not scored quietly. serve.py loads the same pipeline as is used for prediction.",
     )
 
     # Think about serving, monitoring, retraining, approval and data access.
     subPrintStep(
         "Step 5 - Explain what would be needed to extend the workflow into a production deployment.",
-        "",
+        "To get the end-to-end pipeline and the FastAPI service into production, some additional controls are needed. This starts with using real clinical data and clinical validation. The service can then be containerised and protected with authentication and encryption. Model and dataset management is realised via a model registry and a DVC remote. The simple JSON sign-off is replaced by a tamper-evident record. Monitoring and retraining from Step 6 is added. Privacy and regulatory approval for scoring real patients needs to be obtained before this can happen.",
     )
 
     # The predictions above came from one batch. Say what you would check on each new batch before trusting it.
     subPrintStep(
         "Step 6 - Identify operational risks, such as missing inputs, model or data drift, and predictions outside expected ranges.",
-        "",
+        "The model does not know how to handle missing inputs, so it stops with an error. The service also refuses to process incomplete patients, so a data feed that started to send blanks would stop scoring. While it's possible to enter completely implausible but fully complete data for a patient (e.g., a 400-year-old patient), it will return a score even though the input sits outside the range seen in training, and there’s currently no code to detect this. Data and model drift are not currently monitored in any way, so a drop in recall could go unnoticed until real outcomes are compared with predictions.",
     )
 
 
