@@ -982,13 +982,13 @@ def subAnswerValidate(dctConfig: dict, strInputPath: str) -> None:
     # Validation is one automated check. The pytest tests and the CI workflow are the others.
     subPrintStep(
         "Step 5 - Add automated quality checks through tests, validation scripts, continuous integration workflows or another justified approach.",
-        "Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 212 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.",
+        "Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 229 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.",
     )
 
     # Describe .github/workflows/ci.yml: when it runs and what it runs.
     subPrintStep(
         "Step 5 - Where appropriate, configure a workflow such as GitHub Actions to run selected checks automatically.",
-        "A GitHub Actions workflow (.github/workflows/ci.yml) runs all the tests automatically on a clean GitHub-hosted machine (separate from the development computer). The workflow installs all required libraries from requirements.txt and then runs python -m pytest tests. All failing test cases of the executed test suite will then turn the complete run red on the Actions tab. This workflow only runs tests and does not run the full pipeline. DVC manages the raw data, and thus it is not stored in Git.",
+        "A GitHub Actions workflow (.github/workflows/ci.yml) runs all the tests automatically on a clean GitHub-hosted machine (separate from the development computer). The workflow installs all required libraries from requirements.txt and then runs python -m pytest tests. All failing test cases of the executed test suite will then turn the complete run red on the Actions tab. This workflow only runs tests and does not run the full pipeline. The raw data, model and reports are committed to Git, and DVC records their hashes in dvc.lock.",
     )
 
     # The validation rules above stop the run when the data changes shape. Say what happens next and who is told.

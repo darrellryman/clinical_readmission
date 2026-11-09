@@ -1,5 +1,5 @@
 {\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}\f0\fs18
-\b Answer_Evidence output:\b0\i0\ulnone  2026-11-09 17:41:01\par
+\b Answer_Evidence output:\b0\i0\ulnone  2026-11-09 18:25:10\par
 \par
 \par
 \b ###################################################################################\b0\i0\ulnone \par
@@ -265,12 +265,12 @@ Rows removed outside of minimum value (18), maximum value (100): 204\par
 \par
 \i Step 5 - Add automated quality checks through tests, validation scripts, continuous integration workflows or another justified approach.\b0\i0\ulnone \par
 \par
-\b \i Answer:\b0\i0\ulnone  \i Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 212 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.\b0\i0\ulnone \par
+\b \i Answer:\b0\i0\ulnone  \i Automated quality control is applied in two ways: (1) the validate stage of the cleaning process itself runs 11 tests on the cleaned data, which are reported as PASS/FAIL above; (2) the train/evaluate/comparison/plots all call the same 11 tests (which are fail-fast), thus none of them can be run on data that fails to pass the earlier tests. A pytest test suite of 229 tests for the cleaning and filtering, and for loading a file or a web page, as well as for the config checks, the data validation, the feature generation and the RTF reports, runs with its own minimal config file. The tests are also run on push and pull requests to GitHub as part of a GitHub Actions workflow.\b0\i0\ulnone \par
 \par
 \par
 \i Step 5 - Where appropriate, configure a workflow such as GitHub Actions to run selected checks automatically.\b0\i0\ulnone \par
 \par
-\b \i Answer:\b0\i0\ulnone  \i A GitHub Actions workflow (.github/workflows/ci.yml) runs all the tests automatically on a clean GitHub-hosted machine (separate from the development computer). The workflow installs all required libraries from requirements.txt and then runs python -m pytest tests. All failing test cases of the executed test suite will then turn the complete run red on the Actions tab. This workflow only runs tests and does not run the full pipeline. DVC manages the raw data, and thus it is not stored in Git.\b0\i0\ulnone \par
+\b \i Answer:\b0\i0\ulnone  \i A GitHub Actions workflow (.github/workflows/ci.yml) runs all the tests automatically on a clean GitHub-hosted machine (separate from the development computer). The workflow installs all required libraries from requirements.txt and then runs python -m pytest tests. All failing test cases of the executed test suite will then turn the complete run red on the Actions tab. This workflow only runs tests and does not run the full pipeline. The raw data, model and reports are committed to Git, and DVC records their hashes in dvc.lock.\b0\i0\ulnone \par
 \par
 \par
 \i Step 6 - Identify operational risks, such as changes to data formats and failed validation checks.\b0\i0\ulnone \par
@@ -357,6 +357,8 @@ Rows removed outside of minimum value (18), maximum value (100): 204\par
 \par
 \par
 \b \ul Git history\b0\i0\ulnone \par
+5554014  2026-11-09  Update of README.md\par
+af17110  2026-11-09  Full refresh of data, model and reports\par
 0aad170  2026-11-09  Full refresh of data, model and reports\par
 f050d2f  2026-11-09  Full refresh of data, model and reports\par
 6527784  2026-11-09  Full refresh of data, model and reports\par
@@ -396,7 +398,7 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \par
 \b \ul Tracking evidence\b0\i0\ulnone \par
-\b Git commit:\b0\i0\ulnone  0aad170-dirty\par
+\b Git commit:\b0\i0\ulnone  5554014-dirty\par
 \b config.yaml fingerprint:\b0\i0\ulnone  c1854aae15e4\par
 \b Python:\b0\i0\ulnone  3.12.10\par
 \par
@@ -871,7 +873,7 @@ AUC of the column used alone as the score. 0.500 means no signal. Below 0.500 me
 \par
 \par
 \b \ul Tracking evidence\b0\i0\ulnone \par
-\b Git commit:\b0\i0\ulnone  0aad170-dirty\par
+\b Git commit:\b0\i0\ulnone  5554014-dirty\par
 \b config.yaml fingerprint:\b0\i0\ulnone  c1854aae15e4\par
 \b Python:\b0\i0\ulnone  3.12.10\par
 \par
