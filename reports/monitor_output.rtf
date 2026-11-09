@@ -1,43 +1,43 @@
-{\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}\f0\fs18
-\b Monitor output:\b0\i0\ulnone  2026-11-09 17:02:25\par
+{\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}{\colortbl;\red192\green0\blue0;\red0\green128\blue0;\red0\green70\blue160;}\f0\fs18
+\b Monitor output:\b0\i0\ulnone\fs18\cf0  2026-11-10 10:28:20\par
 \par
 \par
-\b ###################################################################################\b0\i0\ulnone \par
+\cf2 \b ###################################################################################\b0\i0\ulnone\fs18\cf0 \par
 \par
 \par
-\b Assessment 2: Applied MLOps pipeline project\b0\i0\ulnone \par
-\par
-\par
-\par
-\b Name:\b0\i0\ulnone  Darrell Ryman\par
-\par
-\b Student ID:\b0\i0\ulnone  S00445230\par
-\par
-\b Course:\b0\i0\ulnone  AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS\par
+\cf2 \fs28 \b Assessment 2: Applied MLOps pipeline project\b0\i0\ulnone\fs18\cf0 \par
 \par
 \par
 \par
-\b Pipeline Stage:\b0\i0\ulnone  Monitor\par
+\cf2 \b Name:\b0\i0\ulnone\fs18\cf0  Darrell Ryman\par
+\par
+\cf2 \b Student ID:\b0\i0\ulnone\fs18\cf0  S00445230\par
+\par
+\cf2 \b Course:\b0\i0\ulnone\fs18\cf0  AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS\par
 \par
 \par
 \par
-\b Client question:\b0\i0\ulnone  At the point of discharge, will an adult inpatient be readmitted within 30 days?\par
-\par
-\b Response variable:\b0\i0\ulnone  readmission_30d\par
-\par
-\b Predictors:\b0\i0\ulnone  age, sex, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension\par
-\par
-\b Data source:\b0\i0\ulnone  data/new/new_synthetic_clinical_dataset.csv\par
+\cf2 \b Pipeline Stage:\b0\i0\ulnone\fs18\cf0  Monitor\par
 \par
 \par
 \par
-\b ##################################################################################\b0\i0\ulnone \par
+\cf2 \b Client question:\b0\i0\ulnone\fs18\cf0  At the point of discharge, will an adult inpatient be readmitted within 30 days?\par
+\par
+\cf2 \b Response variable:\b0\i0\ulnone\fs18\cf0  readmission_30d\par
+\par
+\cf2 \b Predictors:\b0\i0\ulnone\fs18\cf0  age, sex, bmi, systolic_bp, diastolic_bp, glucose, cholesterol, creatinine, diabetes, hypertension\par
+\par
+\cf2 \b Data source:\b0\i0\ulnone\fs18\cf0  data/new/new_synthetic_clinical_dataset.csv\par
 \par
 \par
-\b \ul Batch\b0\i0\ulnone \par
+\par
+\cf2 \b ##################################################################################\b0\i0\ulnone\fs18\cf0 \par
+\par
+\par
+\b \ul Batch\b0\i0\ulnone\fs18\cf0 \par
 484 new rows from data/new/new_synthetic_clinical_dataset.csv, checked against 9196 training rows.\par
 \par
-\b \ul 1. Input drift (PSI, batch against training)\b0\i0\ulnone \par
+\b \ul 1. Input drift (PSI, batch against training)\b0\i0\ulnone\fs18\cf0 \par
 WATCH from 0.1, ALERT from 0.25.\par
 \par
       column    psi result\par
@@ -52,7 +52,7 @@ diastolic_bp 0.0103   PASS\par
     diabetes 0.0000   PASS\par
 hypertension 0.0000   PASS\par
 \par
-\b \ul 2. Data quality\b0\i0\ulnone \par
+\b \ul 2. Data quality\b0\i0\ulnone\fs18\cf0 \par
 WATCH from 1% of rows, ALERT from 5%.\par
 \par
       column           check  count  share result\par
@@ -75,11 +75,11 @@ diastolic_bp  outside limits      0    0.0   PASS\par
          age  outside limits      0    0.0   PASS\par
          sex unseen category      0    0.0   PASS\par
 \par
-\b \ul 3. Output drift (share of patients flagged)\b0\i0\ulnone \par
+\b \ul 3. Output drift (share of patients flagged)\b0\i0\ulnone\fs18\cf0 \par
 Training data: 38.8% flagged. Batch: 38.8% flagged (484 rows scored). Change: 0.0 percentage points. WATCH from 5%, ALERT from 10%.\par
 Result: PASS\par
 \par
-\b \ul Overall\b0\i0\ulnone \par
-\b PASS\b0\i0\ulnone . Input drift: PASS. Data quality: PASS. Output drift: PASS.\par
+\b \ul Overall\b0\i0\ulnone\fs18\cf0 \par
+\b PASS\b0\i0\ulnone\fs18\cf0 . Input drift: PASS. Data quality: PASS. Output drift: PASS.\par
 Recall can only be checked once the real outcomes arrive, so it is not part of this check.\par
 }

@@ -55,6 +55,9 @@ STR_ITALIC = "\033[3m"
 STR_UNDERLINE = "\033[4m"
 STR_RESET = "\033[0m"
 STR_LARGE = "\033[26m"
+STR_RED = "\033[31m"
+STR_BLUE = "\033[34m"
+STR_GREEN = "\033[32m"
 
 # Markers that wrap a picture's file name and width in the printed text. subPrintImage()
 # writes them, and pthSaveRtf() swaps each pair for the picture itself. They are
@@ -67,8 +70,12 @@ DCT_RTF_STYLES = {
     "1": "\\b ",
     "3": "\\i ",
     "4": "\\ul ",
-    "0": "\\b0\\i0\\ulnone ",
-    "": "\\b0\\i0\\ulnone ",
+    "26": "\\fs28 ",
+    "31": "\\cf1 ",
+    "32": "\\cf2 ",
+    "34": "\\cf3 ",
+    "0": "\\b0\\i0\\ulnone\\fs18\\cf0 ",
+    "": "\\b0\\i0\\ulnone\\fs18\\cf0 ",
 }
 
 def subPrintPiplineHeader(strPipelineStage: str = "", strClientQuestion: str = "", strResponseVariable: str = "", strPredictors: str = "", strDataset: str = "") -> None:
@@ -93,22 +100,22 @@ def subPrintPiplineHeader(strPipelineStage: str = "", strClientQuestion: str = "
     strDataset = strDataset.strip() or ""
 
     ##  Assessment 2: Applied MLOps pipeline project
-    print(f"\n{STR_BOLD}###################################################################################{STR_RESET}")
+    print(f"\n{STR_GREEN}{STR_BOLD}###################################################################################{STR_RESET}")
     print(f"\n")
-    print(f"{STR_LARGE}{STR_BOLD}Assessment 2: Applied MLOps pipeline project{STR_RESET}")
+    print(f"{STR_GREEN}{STR_LARGE}{STR_BOLD}Assessment 2: Applied MLOps pipeline project{STR_RESET}")
     print(f"\n")
-    print(f"\n{STR_BOLD}Name:{STR_RESET} Darrell Ryman")
-    print(f"\n{STR_BOLD}Student ID:{STR_RESET} S00445230")
-    print(f"\n{STR_BOLD}Course:{STR_RESET} AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS")
+    print(f"\n{STR_GREEN}{STR_BOLD}Name:{STR_RESET} Darrell Ryman")
+    print(f"\n{STR_GREEN}{STR_BOLD}Student ID:{STR_RESET} S00445230")
+    print(f"\n{STR_GREEN}{STR_BOLD}Course:{STR_RESET} AINT602 - AI SYSTEMS ENGINEERING AND MACHINE LEARNING OPERATIONS")
     print(f"\n")
-    print(f"\n{STR_BOLD}Pipeline Stage:{STR_RESET} {strPipelineStage}")
+    print(f"\n{STR_GREEN}{STR_BOLD}Pipeline Stage:{STR_RESET} {strPipelineStage}")
     print(f"\n")
-    print(f"\n{STR_BOLD}Client question:{STR_RESET} {strClientQuestion}")
-    print(f"\n{STR_BOLD}Response variable:{STR_RESET} {strResponseVariable}")
-    print(f"\n{STR_BOLD}Predictors:{STR_RESET} {strPredictors}")
-    print(f"\n{STR_BOLD}Data source:{STR_RESET} {strDataset}")
+    print(f"\n{STR_GREEN}{STR_BOLD}Client question:{STR_RESET} {strClientQuestion}")
+    print(f"\n{STR_GREEN}{STR_BOLD}Response variable:{STR_RESET} {strResponseVariable}")
+    print(f"\n{STR_GREEN}{STR_BOLD}Predictors:{STR_RESET} {strPredictors}")
+    print(f"\n{STR_GREEN}{STR_BOLD}Data source:{STR_RESET} {strDataset}")
     print(f"\n")
-    print(f"\n{STR_BOLD}##################################################################################{STR_RESET}\n")
+    print(f"\n{STR_GREEN}{STR_BOLD}##################################################################################{STR_RESET}\n")
 
 
 def subPrintStep(strQuestion: str, strAnswer: str = "") -> None:
@@ -132,7 +139,7 @@ def subPrintStep(strQuestion: str, strAnswer: str = "") -> None:
     strShown = strAnswer.strip() or "(answer not written yet)"
 
     # Bold plus italic on, the text, then everything off again.
-    print(f"\n{STR_ITALIC}{strQuestion}{STR_RESET}")
+    print(f"\n{STR_BOLD}{STR_ITALIC}{STR_RED}{strQuestion}{STR_RESET}")
     print(f"\n{STR_BOLD}{STR_ITALIC}Answer:{STR_RESET} {STR_ITALIC}{strShown}{STR_RESET}\n")
 
 
@@ -389,8 +396,9 @@ def pthSaveRtf(strText: str, varPath) -> Path:
 
     # \par is the RTF line break. Courier New keeps table columns lined up.
     strBody = strEscaped.replace("\n", "\\par\n")
-    strRtf = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Courier New;}}\\f0\\fs18\n" + strBody + "}"
-
+    strRtf = ("{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Courier New;}}"
+              "{\\colortbl;\\red192\\green0\\blue0;\\red0\\green128\\blue0;\\red0\\green70\\blue160;}"
+              "\\f0\\fs18\n" + strBody + "}")
     pthFile = Path(varPath)
     pthFile.parent.mkdir(parents=True, exist_ok=True)
     pthFile.write_text(strRtf, encoding="ascii")
