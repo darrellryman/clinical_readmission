@@ -130,6 +130,7 @@ python -m pytest tests -q
 Way A, one command. The raw CSV is already in the repository, so DVC can start straight away. `--force` reruns every stage, because on a fresh clone DVC would otherwise report that everything is up to date.
 
 ```
+python -m src.ingest
 dvc repro --force
 ```
 
