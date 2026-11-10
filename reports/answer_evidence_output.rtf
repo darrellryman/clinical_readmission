@@ -1,5 +1,5 @@
 {\rtf1\ansi\deff0{\fonttbl{\f0 Courier New;}}{\colortbl;\red192\green0\blue0;\red0\green128\blue0;\red0\green70\blue160;}\f0\fs18
-\b Answer_Evidence output:\b0\i0\ulnone\fs18\cf0  2026-11-10 10:32:50\par
+\b Answer_Evidence output:\b0\i0\ulnone\fs18\cf0  2026-11-10 10:59:28\par
 \par
 \par
 \cf2 \b ###################################################################################\b0\i0\ulnone\fs18\cf0 \par
@@ -671,6 +671,8 @@ logistic_regression candidate      logistic        0.606       0.020     0.646 0
 \cf3 \b \ul \fs28 4. VERSIONING, TRACKING AND REPRODUCIBILITY\b0\i0\ulnone\fs18\cf0 \par
 \par
 \b \ul Git history\b0\i0\ulnone\fs18\cf0 \par
+568ab7a  2026-11-10  Fix display test, pin CI runner and update actions\par
+49fbae6  2026-11-10  Restructure answers_evidence into the six assessment sections\par
 fae7454  2026-11-09  Removed .gitignore,  synthetic_clinical_dataset.csv.dvc, added  synthetic_clinical_dataset.csv to the git repository and updated answers_evidence.py\par
 5554014  2026-11-09  Update of README.md\par
 af17110  2026-11-09  Full refresh of data, model and reports\par
@@ -713,7 +715,7 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \par
 \b \ul Tracking evidence\b0\i0\ulnone\fs18\cf0 \par
-\b Git commit:\b0\i0\ulnone\fs18\cf0  fae7454-dirty\par
+\b Git commit:\b0\i0\ulnone\fs18\cf0  568ab7a-dirty\par
 \b config.yaml fingerprint:\b0\i0\ulnone\fs18\cf0  c1854aae15e4\par
 \b Python:\b0\i0\ulnone\fs18\cf0  3.12.10\par
 \par
@@ -734,9 +736,9 @@ c889671  2026-11-07  Add ingestion and validation stages\par
   plots: 12 inputs, 2 outputs recorded\par
   answers_evidence: 16 inputs, 1 outputs recorded\par
   train output artifacts/model.joblib: md5 12a23dd1\par
-  train output artifacts/model_card.json: md5 f2b2c3a7\par
+  train output artifacts/model_card.json: md5 4a9c714b\par
   train output data/processed/features.csv: md5 6fe0c4cb\par
-  train output reports/train_output.rtf: md5 eff30fa2\par
+  train output reports/train_output.rtf: md5 3606d043\par
 \par
 \b \i \cf1 4.2 - Track the code, configuration and environment needed to reproduce the project.\b0\i0\ulnone\fs18\cf0 \par
 \par
@@ -745,25 +747,25 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \b \ul MLflow run history\b0\i0\ulnone\fs18\cf0 \par
 \par
-\b Experiment:\b0\i0\ulnone\fs18\cf0  clinical_readmission, 10 most recent of 169 runs shown\par
+\b Experiment:\b0\i0\ulnone\fs18\cf0  clinical_readmission, 10 most recent of 175 runs shown\par
 \par
    started (UTC)    stage                             run git commit       config  roc_auc\par
+2026-11-09 23:59  compare                   random_forest    568ab7a c1854aae15e4    0.636\par
+2026-11-09 23:59  compare             logistic_regression    568ab7a c1854aae15e4    0.639\par
+2026-11-09 23:59  compare                     rule_age_65    568ab7a c1854aae15e4    0.511\par
+2026-11-09 23:59  compare                        baseline    568ab7a c1854aae15e4    0.500\par
+2026-11-09 23:59 evaluate logistic_regression_test_scores    568ab7a c1854aae15e4    0.639\par
+2026-11-09 23:59    train             logistic_regression    568ab7a c1854aae15e4      NaN\par
 2026-11-09 23:27  compare                   random_forest    fae7454 c1854aae15e4    0.636\par
 2026-11-09 23:27  compare             logistic_regression    fae7454 c1854aae15e4    0.639\par
 2026-11-09 23:27  compare                     rule_age_65    fae7454 c1854aae15e4    0.511\par
 2026-11-09 23:27  compare                        baseline    fae7454 c1854aae15e4    0.500\par
-2026-11-09 23:27 evaluate logistic_regression_test_scores    fae7454 c1854aae15e4    0.639\par
-2026-11-09 23:27    train             logistic_regression    fae7454 c1854aae15e4      NaN\par
-2026-11-09 23:01  compare                   random_forest    fae7454 c1854aae15e4    0.636\par
-2026-11-09 23:01  compare             logistic_regression    fae7454 c1854aae15e4    0.639\par
-2026-11-09 23:01  compare                     rule_age_65    fae7454 c1854aae15e4    0.511\par
-2026-11-09 23:01  compare                        baseline    fae7454 c1854aae15e4    0.500\par
 \par
 \b \ul Latest train run: logistic_regression\b0\i0\ulnone\fs18\cf0 \par
 \par
 \b Settings:\b0\i0\ulnone\fs18\cf0  features.categorical_columns=\{'sex': ['Female', 'Male']\}; features.difference_columns=\{'pulse_pressure': ['systolic_bp', 'diastolic_bp']\}; features.feature_columns=['age', 'sex', 'bmi', 'systolic_bp', 'diastolic_bp', 'glucose', 'cholesterol', 'creatinine', 'diabetes', 'hypertension']; features.stratify=True; features.test_size=0.2; model.C=1.0; model.class_weight=balanced; model.max_iter=1000; project.random_state=42\par
 \par
-\b git_commit:\b0\i0\ulnone\fs18\cf0  fae7454-dirty\par
+\b git_commit:\b0\i0\ulnone\fs18\cf0  568ab7a-dirty\par
 \par
 \b raw_data_fingerprint:\b0\i0\ulnone\fs18\cf0  bee99ea6e73b\par
 \par
@@ -779,7 +781,7 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \b Settings:\b0\i0\ulnone\fs18\cf0  evaluation.average=weighted; evaluation.positive_label=1; test_rows=1840\par
 \par
-\b git_commit:\b0\i0\ulnone\fs18\cf0  fae7454-dirty\par
+\b git_commit:\b0\i0\ulnone\fs18\cf0  568ab7a-dirty\par
 \par
 \b raw_data_fingerprint:\b0\i0\ulnone\fs18\cf0  bee99ea6e73b\par
 \par
@@ -795,7 +797,7 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \b Settings:\b0\i0\ulnone\fs18\cf0  model.class_weight=balanced; model.max_depth=6; model.min_samples_leaf=20; model.n_estimators=300; model.type=random_forest\par
 \par
-\b git_commit:\b0\i0\ulnone\fs18\cf0  fae7454-dirty\par
+\b git_commit:\b0\i0\ulnone\fs18\cf0  568ab7a-dirty\par
 \par
 \b raw_data_fingerprint:\b0\i0\ulnone\fs18\cf0  bee99ea6e73b\par
 \par
@@ -816,8 +818,8 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \par
 \b \ul Model provenance (from the model card)\b0\i0\ulnone\fs18\cf0 \par
-\b Created (UTC):\b0\i0\ulnone\fs18\cf0  2026-11-09 23:27:21\par
-\b Git commit:\b0\i0\ulnone\fs18\cf0  fae7454-dirty\par
+\b Created (UTC):\b0\i0\ulnone\fs18\cf0  2026-11-09 23:59:02\par
+\b Git commit:\b0\i0\ulnone\fs18\cf0  568ab7a-dirty\par
 \b Random seed:\b0\i0\ulnone\fs18\cf0  42\par
 \b Gate result:\b0\i0\ulnone\fs18\cf0  PASSED\par
 \b Status:\b0\i0\ulnone\fs18\cf0  Passed the automated gate. Awaiting sign-off: run python -m src.approve before any real use.\par
@@ -833,7 +835,7 @@ c889671  2026-11-07  Add ingestion and validation stages\par
 \par
 \par
 \b \ul Tracking evidence\b0\i0\ulnone\fs18\cf0 \par
-\b Git commit:\b0\i0\ulnone\fs18\cf0  fae7454-dirty\par
+\b Git commit:\b0\i0\ulnone\fs18\cf0  568ab7a-dirty\par
 \b config.yaml fingerprint:\b0\i0\ulnone\fs18\cf0  c1854aae15e4\par
 \b Python:\b0\i0\ulnone\fs18\cf0  3.12.10\par
 \par
@@ -854,9 +856,9 @@ c889671  2026-11-07  Add ingestion and validation stages\par
   plots: 12 inputs, 2 outputs recorded\par
   answers_evidence: 16 inputs, 1 outputs recorded\par
   train output artifacts/model.joblib: md5 12a23dd1\par
-  train output artifacts/model_card.json: md5 f2b2c3a7\par
+  train output artifacts/model_card.json: md5 4a9c714b\par
   train output data/processed/features.csv: md5 6fe0c4cb\par
-  train output reports/train_output.rtf: md5 eff30fa2\par
+  train output reports/train_output.rtf: md5 3606d043\par
 \par
 \b \i \cf1 4.6 - Provide sufficient set-up and run instructions for another person to reproduce the result.\b0\i0\ulnone\fs18\cf0 \par
 \par

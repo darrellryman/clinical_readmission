@@ -1,6 +1,6 @@
 {
   "model_type": "logistic_regression",
-  "created_utc": "2026-11-09 23:27:21",
+  "created_utc": "2026-11-09 23:59:02",
   "parameters": {
     "max_iter": 1000,
     "C": 1.0,
@@ -38,7 +38,7 @@
   "model_fingerprint": "87212eac3eb0",
   "data_fingerprint": "72360c885da0",
   "config_fingerprint": "c1854aae15e4",
-  "git_commit": "fae7454-dirty",
+  "git_commit": "568ab7a-dirty",
   "gate": {
     "enabled": true,
     "baseline_cv_auc": 0.5,
