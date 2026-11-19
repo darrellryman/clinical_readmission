@@ -24,7 +24,7 @@ data:
   # kaggle_file from the Kaggle dataset kaggle_dataset (needs: pip install kagglehub)
   # into raw_path. Either way every later stage (and DVC and MLflow) still sees one
   # raw file in one place.
-  source: kaggle
+  source: file
   # The original dataset as you received it. Only ingest.py reads this file.
   # With source: url this is where the download is saved.
   raw_path: data/raw/synthetic_clinical_dataset.csv
